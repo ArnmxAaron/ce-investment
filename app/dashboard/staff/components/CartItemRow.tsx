@@ -1,5 +1,4 @@
-import { CartItem } from '../../../hooks/useSalesLogic'
-
+import { CartItem } from '@/hooks/useSalesLogic'
 interface Props {
   item: CartItem;
   onEdit: (item: CartItem) => void;

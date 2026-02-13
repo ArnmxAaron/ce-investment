@@ -1,8 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSalesLogic, Product, CartItem } from '../../../hooks/useSalesLogic'
 import { ProductCard } from '../../../components/ProductCard'
-// Ensure these files exist in /app/dashboard/staff/components/
 import { ProductModal } from './components/ProductModal'
 import { CartItemRow } from './components/CartItemRow'
 
@@ -21,25 +20,29 @@ export default function StaffSalesPage() {
     filteredProducts 
   } = useSalesLogic()
 
-  // Modal State for configuring items
+  // --- HYDRATION FIX ---
+  const [tempId, setTempId] = useState("");
+  useEffect(() => {
+    setTempId(new Date().getTime().toString().slice(-6));
+  }, []);
+
+  // Modal State
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Opens the pop-up when clicking "Add to Cart" or the "Pencil" icon
   const openConfigurator = (p: Product | CartItem) => {
     setSelectedProduct(p as Product);
     setIsModalOpen(true);
   };
 
-  const handleConfirmAdd = (product: Product, quantity: number, price: number) => {
-    // This loops the current addToCart logic based on the quantity selected in the modal
-    for(let i = 0; i < quantity; i++) {
-        addToCart(product); 
-    }
+  // UPDATED: Now accepts variantType from the Modal
+  const handleConfirmAdd = (product: Product, quantity: number, price: number, variantType: string) => {
+    // We pass the variant information to your addToCart function
+    // Ensure your useSalesLogic.ts addToCart can handle these extra arguments
+    addToCart(product, quantity, price, variantType); 
     setIsModalOpen(false);
   };
 
-  // Calculate total for the display
   const totalAmount = cart.reduce((acc: number, i: CartItem) => acc + (i.price * i.quantity), 0);
 
   return (
@@ -56,18 +59,14 @@ export default function StaffSalesPage() {
       {/* STATUS TOASTS */}
       {toast && (
         <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[200] px-8 py-4 rounded-2xl shadow-2xl font-black text-white transition-all transform animate-bounce flex items-center gap-3 ${
-          toast.type === 'success' 
-            ? 'bg-emerald-600' 
-            : toast.type === 'error' 
-              ? 'bg-rose-600' 
-              : 'bg-blue-600'
+          toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-rose-600' : 'bg-blue-600'
         }`}>
           <span>{toast.message}</span>
         </div>
       )}
 
       {/* MAIN SECTION: Product Discovery */}
-      <div className="flex-1 p-6 md:p-10 overflow-y-auto h-screen">
+      <div className="flex-1 p-6 md:p-10 overflow-y-auto h-screen custom-scrollbar">
         <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-10">
           <div>
             <h1 className="text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4">
@@ -112,7 +111,11 @@ export default function StaffSalesPage() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map((p: Product) => (
-              <ProductCard key={p.id} item={p} onAdd={() => openConfigurator(p)} />
+              <ProductCard 
+                key={p.id} 
+                item={p} 
+                onAdd={() => openConfigurator(p)} 
+              />
             ))}
           </div>
         )}
@@ -125,12 +128,12 @@ export default function StaffSalesPage() {
             <h2 className="text-2xl font-black italic tracking-tighter text-slate-800 uppercase">Receipt</h2>
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Transaction ID</span>
-              <span className="text-[10px] font-mono text-slate-300 uppercase">#TEMP-{new Date().getTime().toString().slice(-6)}</span>
+              <span className="text-[10px] font-mono text-slate-400 uppercase">#TEMP-{tempId || "000000"}</span>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-8 py-4 space-y-4 custom-scrollbar">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-200">
               <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">

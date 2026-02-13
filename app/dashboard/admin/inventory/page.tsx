@@ -68,7 +68,10 @@ export default function InventoryPage() {
   })
 
   return (
+    /* h-screen + overflow-hidden on the wrapper prevents the body from scrolling */
     <div className="h-screen flex flex-col bg-[#F8FAFC] overflow-hidden">
+      
+      {/* HEADER: Fixed at the top */}
       <InventoryHeader 
         searchQuery={searchQuery} 
         setSearchQuery={setSearchQuery}
@@ -77,20 +80,27 @@ export default function InventoryPage() {
         products={products}
       />
 
+      {/* CONTENT AREA: Takes up remaining height */}
       <div className="flex flex-1 overflow-hidden">
-        <InventorySidebar 
-          onImport={handleBulkImport} 
-          onManualAdd={handleManualAdd} 
-          loading={loading} 
-        />
         
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
+        {/* SIDEBAR: Independent Scroll */}
+        <aside className="w-80 lg:w-96 h-full overflow-y-auto border-r border-slate-100 bg-white/50 custom-scrollbar">
+          <InventorySidebar 
+            onImport={handleBulkImport} 
+            onManualAdd={handleManualAdd} 
+            loading={loading} 
+          />
+        </aside>
+        
+        {/* MAIN LIST: Independent Scroll */}
+        <main className="flex-1 h-full overflow-y-auto p-6 md:p-10 custom-scrollbar scroll-smooth">
           <InventoryList 
             products={filtered} 
             onRefresh={fetchInventory} 
             onDelete={fetchInventory} 
           />
         </main>
+
       </div>
     </div>
   )

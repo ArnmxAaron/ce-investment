@@ -180,4 +180,4 @@ export function ProductModal({ product, isOpen, onClose, onConfirm }: ProductMod
       </motion.div>
     </div>
   );
-}
+}     

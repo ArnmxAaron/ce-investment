@@ -3,7 +3,6 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  /* Add custom scrollbar colors to your variables */
   --scrollbar-thumb: #e2e8f0; 
   --scrollbar-hover: #cbd5e1;
 }
@@ -13,6 +12,19 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Define the custom breakpoints for your big monitor */
+  --breakpoint-3xl: 1800px;
+  --breakpoint-4xl: 2200px;
+
+  /* 1. Define the Keyframes */
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+  
+  /* 2. Map the animation to a tailwind variable */
+  --animation-shimmer: shimmer 2s infinite linear;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -28,17 +40,28 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
-  /* Ensure the body itself doesn't bounce/scroll if we want app-like behavior */
   overflow: hidden; 
 }
 
-/* --- CUSTOM SCROLLBAR UTILITY --- */
-.custom-scrollbar {
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: var(--scrollbar-thumb) transparent; /* Firefox */
+/* 3. REFIXED SHIMMER UTILITY */
+/* Instead of @apply animate-shimmer, we use the animation property directly */
+@utility skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  background-color: #f1f5f9; /* equivalent to bg-slate-100 */
+  animation: var(--animation-shimmer);
 }
 
-/* Chrome, Edge, and Safari */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }

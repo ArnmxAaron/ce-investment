@@ -1,40 +1,47 @@
 'use client'
-import { FiCalendar, FiBell } from 'react-icons/fi'
+import { FiCalendar, FiTrendingUp, FiDownload } from 'react-icons/fi'
 
-export function DashboardHeader({ selectedDate, setSelectedDate, notifications, setNotifications }: any) {
+export function DashboardHeader({ selectedDate, setSelectedDate }: any) {
   return (
-    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Executive Hub</h1>
-        <p className="text-slate-500 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
-          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-          Live Revenue & Inventory Metrics
+    <header className="flex flex-col md:flex-row justify-between items-end md:items-center pb-8 border-b border-slate-100 mb-8">
+      {/* Title Section */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-3">
+          <div className="w-1.5 h-8 bg-blue-600 rounded-full" /> 
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">
+            Executive Hub
+          </h1>
+        </div>
+        <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.25em] flex items-center gap-2 pl-4">
+          <FiTrendingUp className="text-blue-500" />
+          Real-time Performance Metrics
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
-        <button 
-          onClick={() => setNotifications(0)}
-          className="relative p-4 bg-white rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-blue-600 transition-all group"
-        >
-          <FiBell size={20} className="group-hover:rotate-12 transition-transform" />
-          {notifications > 0 && (
-            <span className="absolute top-2 right-2 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-              {notifications}
-            </span>
-          )}
+      {/* Control Section */}
+      <div className="flex items-center gap-4 mt-6 md:mt-0">
+        {/* Export Utility - Standard for Executive Views */}
+        <button className="flex items-center gap-2 px-5 py-3 text-slate-500 hover:text-slate-900 font-black text-[10px] uppercase tracking-widest transition-colors border border-transparent hover:border-slate-200 rounded-2xl">
+          <FiDownload size={16} />
+          Export Report
         </button>
 
-        <div className="flex items-center gap-3 bg-white p-2 pr-4 rounded-2xl shadow-sm border border-slate-100">
-          <div className="bg-blue-50 p-2 rounded-xl text-blue-600">
-            <FiCalendar size={18} />
+        {/* Date Filter - Professional "Standard" Design */}
+        <div className="flex items-center gap-4 bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-blue-300 group">
+          <div className="flex flex-col">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+              Data Perspective
+            </span>
+            <div className="flex items-center gap-2">
+              <FiCalendar className="text-blue-600" size={14} />
+              <input 
+                type="date" 
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="outline-none text-xs font-black text-slate-800 bg-transparent cursor-pointer uppercase tracking-tighter" 
+              />
+            </div>
           </div>
-          <input 
-            type="date" 
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="outline-none text-xs font-black text-slate-700 bg-transparent cursor-pointer uppercase tracking-tight" 
-          />
         </div>
       </div>
     </header>

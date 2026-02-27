@@ -1,42 +1,57 @@
 'use client'
 import { useState } from 'react'
 import { useAdminDashboard } from '@/hooks/useAdminDashboard'
-import { StatCard } from './components/StatCard'
 import { DashboardHeader } from './components/DashboardHeader'
-import { QuickActions } from './components/QuickActions'
+import { MetricBar } from './components/MetricBar' // Redesigned Stat area
 import { RevenueChart } from './components/RevenueChart'
 import { SalesFeed } from './components/SalesFeed'
+import { TopProducts } from './components/TopProducts'
 
 export default function AdminHome() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-  const { stats, chartData, recentSales, notifications, setNotifications } = useAdminDashboard(selectedDate)
+  
+  // Custom hook fetching your Supabase data
+  const { stats, chartData, recentSales, topProducts, loading } = useAdminDashboard(selectedDate)
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 space-y-8">
+    <div className="max-w-screen-2xl mx-auto space-y-2">
+      {/* 1. Header with Date Filter */}
       <DashboardHeader 
         selectedDate={selectedDate} 
         setSelectedDate={setSelectedDate} 
-        notifications={notifications} 
-        setNotifications={setNotifications} 
       />
 
-      <QuickActions />
+      {/* 2. Key Performance Metrics (MetricBar replaces StatCards for a cleaner look) */}
+      <MetricBar 
+        stats={{
+          revenue: stats.dailyIncome,
+          units: stats.totalOrders,
+          inventory: stats.totalStockItems,
+          alerts: stats.outOfStockCount
+        }} 
+      />
 
-      {/* STATS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Live Inventory" value={stats.totalStockItems} type="stock" trend="+4%" />
-        <StatCard label="Orders Today" value={stats.totalOrders} type="orders" trend="+18%" />
-        <StatCard label="Revenue Today" value={`NLe ${stats.dailyIncome}`} type="income" trend="+12.5%" />
-        <StatCard label="Stock Alerts" value={stats.outOfStockCount} type="warning" trend="Critical" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
+      {/* 3. Main Analytics Grid */}
+      <div className={`grid grid-cols-1 xl:grid-cols-4 gap-12 transition-opacity duration-500 ${loading ? 'opacity-40' : 'opacity-100'}`}>
+        
+        {/* LEFT & CENTER: Performance Trends (3/4 Width) */}
+        <div className="xl:col-span-3 space-y-12">
           <RevenueChart data={chartData} />
+          
+          {/* Optional: Add a secondary detailed table or map here later */}
+          <div className="pt-6 border-t border-slate-50">
+             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">
+               System Status: Enterprise Secured • Real-time Data Active
+             </p>
+          </div>
         </div>
-        <div>
+
+        {/* RIGHT: Live Activity & Inventory Leaders (1/4 Width) */}
+        <div className="xl:col-span-1 border-l border-slate-100 pl-10 space-y-4">
           <SalesFeed sales={recentSales} />
+          <TopProducts products={topProducts} />
         </div>
+        
       </div>
     </div>
   )

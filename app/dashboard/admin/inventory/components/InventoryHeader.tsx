@@ -30,10 +30,18 @@ export function InventoryHeader({ searchQuery, setSearchQuery, showOnlyZero, set
   }
 
   return (
-    <header className="bg-white border-b border-slate-100 p-6 flex flex-col xl:flex-row justify-between items-center gap-6 z-20">
-      {/* BRANDING & TOTAL VALUE */}
-      <div className="flex items-center gap-6 w-full xl:w-auto">
-        <div>
+    /**
+     * FIX LOGIC:
+     * 1. 'w-full' ensures it spans the entire browser width.
+     * 2. Removed any 'max-w' that might be capping the width.
+     * 3. 'px-4 md:px-8 lg:px-12' ensures the content isn't too close to the edges 
+     * but still stretches with the monitor size.
+     */
+    <header className="w-full bg-white border-b border-slate-100 p-6 px-4 md:px-8 lg:px-12 flex flex-col xl:flex-row justify-between items-center gap-6 z-20">
+      
+      {/* BRANDING & TOTAL VALUE - Pushed to the far Left */}
+      <div className="flex items-center justify-between xl:justify-start gap-8 w-full xl:w-auto flex-1">
+        <div className="flex-shrink-0">
           <h1 className="text-2xl font-black uppercase italic tracking-tighter text-slate-900">Inventory</h1>
           <div className="flex items-center gap-2 mt-1">
             <span className="flex items-center gap-1 text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md uppercase tracking-widest">
@@ -52,9 +60,9 @@ export function InventoryHeader({ searchQuery, setSearchQuery, showOnlyZero, set
         </div>
       </div>
       
-      {/* SEARCH & FILTERS */}
-      <div className="flex flex-wrap gap-3 w-full xl:w-auto">
-        <div className="relative flex-1 md:w-80">
+      {/* SEARCH & FILTERS - Pushed to the far Right */}
+      <div className="flex flex-wrap md:flex-nowrap items-center gap-3 w-full xl:w-auto xl:flex-1 xl:justify-end">
+        <div className="relative flex-1 max-w-md w-full md:w-80">
           <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             className="w-full pl-11 pr-4 py-3 bg-slate-50 border-transparent rounded-[1.2rem] font-bold text-sm outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all"
@@ -64,23 +72,26 @@ export function InventoryHeader({ searchQuery, setSearchQuery, showOnlyZero, set
           />
         </div>
         
-        <button 
-          onClick={() => setShowOnlyZero(!showOnlyZero)}
-          className={`flex items-center gap-2 px-5 py-3 rounded-[1.2rem] border font-black text-[10px] uppercase tracking-widest transition-all ${
-            showOnlyZero 
-            ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-200' 
-            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-          }`}
-        >
-          <FiFilter size={16} /> {showOnlyZero ? 'Out of Stock' : 'Filter 0'}
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setShowOnlyZero(!showOnlyZero)}
+            className={`flex items-center gap-2 px-5 py-3 rounded-[1.2rem] border font-black text-[10px] uppercase tracking-widest transition-all ${
+              showOnlyZero 
+              ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-200' 
+              : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <FiFilter size={16} /> {showOnlyZero ? 'Out of Stock' : 'Filter 0'}
+          </button>
 
-        <button 
-          onClick={exportToExcel} 
-          className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-[1.2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md"
-        >
-          <FiDownload className="text-emerald-400" /> Export Excel
-        </button>
+          <button 
+            onClick={exportToExcel} 
+            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-[1.2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md"
+          >
+            <FiDownload className="text-emerald-400" /> 
+            <span className="hidden sm:inline">Export Excel</span>
+          </button>
+        </div>
       </div>
 
       {/* MOBILE ONLY VALUE DISPLAY */}

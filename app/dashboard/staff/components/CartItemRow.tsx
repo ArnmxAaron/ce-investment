@@ -1,31 +1,33 @@
-import { CartItem } from '@/hooks/useSalesLogic'
-interface Props {
-  item: CartItem;
-  onEdit: (item: CartItem) => void;
-}
+// app/dashboard/staff/components/CartItemRow.tsx
+import { FiX } from 'react-icons/fi'
 
-export function CartItemRow({ item, onEdit }: Props) {
+export function CartItemRow({ item }: any) {
   return (
-    <div className="flex justify-between items-start group animate-in fade-in slide-in-from-right-4 duration-300 bg-white hover:bg-slate-50 p-2 -mx-2 rounded-xl transition-colors">
-      <div className="max-w-[70%]">
-        <div className="flex items-center gap-2 mb-1">
-          <p className="font-black text-xs uppercase text-slate-800 leading-tight">{item.name}</p>
-          <button 
-            onClick={() => onEdit(item)}
-            className="opacity-0 group-hover:opacity-100 text-blue-500 hover:text-blue-700 transition-all"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-            </svg>
-          </button>
+    <div className="group relative mb-8 animate-in fade-in slide-in-from-right-4">
+      <div className="flex justify-between items-start">
+        <div className="flex gap-4 items-start">
+          {/* Item Badge */}
+          <div className="bg-[#0f172a] text-white text-[10px] font-black w-7 h-6 flex items-center justify-center rounded italic">
+            {item.quantity}x
+          </div>
+          <div>
+            <h4 className="text-[13px] font-black text-slate-900 uppercase tracking-tight leading-none mb-1">
+              {item.name}
+            </h4>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">
+              UNIT: NLE {item.price.toLocaleString()}
+            </p>
+          </div>
         </div>
-        <p className="text-[11px] font-bold text-blue-500 font-mono">
-          {item.quantity} × {item.price.toLocaleString()}
-        </p>
+        <div className="text-right">
+           <p className="text-xl font-black text-slate-900 tracking-tighter leading-none mb-1">
+             {(item.price * item.quantity).toLocaleString()}
+           </p>
+           <p className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">AMOUNT</p>
+        </div>
       </div>
-      <p className="font-black text-sm text-slate-900 font-mono bg-slate-50 px-3 py-1 rounded-lg">
-        {(item.price * item.quantity).toLocaleString()}
-      </p>
+      {/* Dashed line matching image */}
+      <div className="mt-6 border-b border-dashed border-slate-100 w-full" />
     </div>
-  );
+  )
 }

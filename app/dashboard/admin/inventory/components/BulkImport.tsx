@@ -1,16 +1,36 @@
 'use client'
 import { useState } from 'react'
 import * as XLSX from 'xlsx'
-import { FiUploadCloud, FiCheckCircle, FiLoader } from 'react-icons/fi'
+import { FiUploadCloud, FiCheckCircle, FiLoader, FiAlertTriangle, FiTrash2 } from 'react-icons/fi'
+import { supabase } from '@/lib/supabase'
 
 interface Props {
-  // Updated to receive the full Workbook object for multi-tab processing
+  // Receives the Workbook object for multi-tab processing
   onImportFull: (workbook: XLSX.WorkBook) => Promise<void>;
 }
 
 export function BulkImport({ onImportFull }: Props) {
   const [loading, setLoading] = useState(false);
+  const [isWiping, setIsWiping] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  // OPTIONAL: Function to wipe the database before a clean re-import
+  const handleWipeDatabase = async () => {
+    const confirmWipe = confirm("⚠️ WARNING: This will delete ALL products in the database. Are you sure you want to start fresh?");
+    if (!confirmWipe) return;
+
+    setIsWiping(true);
+    try {
+      // Deletes all rows from the products table
+      const { error } = await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error) throw error;
+      alert("Database wiped successfully. You can now upload the clean Excel.");
+    } catch (err: any) {
+      alert("Error wiping database: " + err.message);
+    } finally {
+      setIsWiping(false);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -23,10 +43,10 @@ export function BulkImport({ onImportFull }: Props) {
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target?.result;
-        // Read the file as a Workbook object to access all tabs (General, Zinc, Paints, etc.)
+        // Read the file as a Workbook object to access all tabs
         const wb = XLSX.read(bstr, { type: 'binary' });
         
-        // Pass the entire workbook to page.tsx for multi-tab processing
+        // Pass the entire workbook to the parent page logic (handleImportFull)
         await onImportFull(wb);
         
         setStatus('success');
@@ -37,8 +57,7 @@ export function BulkImport({ onImportFull }: Props) {
         alert("Failed to read Excel file. Ensure it is a valid .xlsx or .xls file.");
       } finally {
         setLoading(false);
-        // Reset input value so the same file can be uploaded again if needed
-        e.target.value = '';
+        e.target.value = ''; // Reset input
       }
     };
 
@@ -51,9 +70,25 @@ export function BulkImport({ onImportFull }: Props) {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full space-y-4">
+      {/* Wipe Database Button - Crucial for fixing your duplicate issue */}
+      <button
+        onClick={handleWipeDatabase}
+        disabled={isWiping || loading}
+        className="w-full py-3 px-4 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 group"
+      >
+        {isWiping ? (
+          <FiLoader className="animate-spin text-rose-500" />
+        ) : (
+          <FiTrash2 className="text-rose-500 group-hover:scale-110 transition-transform" />
+        )}
+        <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">
+          {isWiping ? "Wiping Database..." : "Wipe Database for Clean Import"}
+        </span>
+      </button>
+
       <label className={`
-        relative flex flex-col items-center justify-center w-full h-40 
+        relative flex flex-col items-center justify-center w-full h-44 
         border-2 border-dashed rounded-[2.5rem] cursor-pointer
         transition-all duration-500 group
         ${status === 'success' ? 'bg-emerald-50 border-emerald-300' : 
@@ -64,12 +99,12 @@ export function BulkImport({ onImportFull }: Props) {
           {loading ? (
             <div className="flex flex-col items-center gap-3">
               <FiLoader className="w-8 h-8 text-blue-600 animate-spin" />
-              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">Reading All Tabs...</p>
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">Processing Multi-Tabs...</p>
             </div>
           ) : status === 'success' ? (
             <div className="flex flex-col items-center gap-2 text-emerald-600 animate-bounce">
               <FiCheckCircle size={32} />
-              <p className="text-[10px] font-black uppercase tracking-widest">Multi-Tab Import Ready!</p>
+              <p className="text-[10px] font-black uppercase tracking-widest">Master Sync Complete!</p>
             </div>
           ) : (
             <>
@@ -77,18 +112,18 @@ export function BulkImport({ onImportFull }: Props) {
                 <FiUploadCloud size={32} />
               </div>
               <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest leading-relaxed">
-                Bulk Upload Master Excel <br/>
-                <span className="text-[9px] font-bold text-slate-400 italic normal-case">
-                  (ITEM, DESCRIPTION, UNIT PRICE)
+                Upload Master Excel <br/>
+                <span className="text-[9px] font-bold text-slate-400 italic normal-case block mt-1">
+                  (Groups duplicates & cleans 45/50 prices)
                 </span>
               </p>
-              <div className="mt-4 flex gap-2">
+              
+              <div className="mt-4 flex flex-wrap justify-center gap-1.5">
                 {['General', 'Zinc', 'Paints'].map(tab => (
-                  <span key={tab} className="text-[8px] font-black bg-slate-100 text-slate-400 px-2 py-1 rounded-md uppercase">
+                  <span key={tab} className="text-[7px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded-md uppercase border border-slate-200">
                     {tab}
                   </span>
                 ))}
-                <span className="text-[8px] font-black bg-slate-100 text-slate-400 px-2 py-1 rounded-md uppercase">...</span>
               </div>
             </>
           )}
@@ -99,13 +134,13 @@ export function BulkImport({ onImportFull }: Props) {
           className="hidden" 
           accept=".xlsx, .xls" 
           onChange={handleFileUpload} 
-          disabled={loading} 
+          disabled={loading || isWiping} 
         />
       </label>
       
-      {status === 'success' && (
-        <p className="mt-2 text-center text-[9px] font-black text-emerald-500 uppercase tracking-tighter">
-          Check the right panel to update stock counts
+      {status === 'error' && (
+        <p className="text-center text-[9px] font-black text-rose-500 uppercase flex items-center justify-center gap-1">
+          <FiAlertTriangle /> Error reading file. Check format.
         </p>
       )}
     </div>

@@ -13,6 +13,7 @@ export interface Product {
   id: string;
   name: string;
   category: string;
+  image_path?: string; // Add this line!
   variants: ProductVariant[]; // The array of sizes/types
 }
 

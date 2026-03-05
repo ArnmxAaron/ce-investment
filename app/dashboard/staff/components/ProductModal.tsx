@@ -2,19 +2,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiX, FiPlus, FiMinus, FiShoppingBag, FiAlertCircle, FiCheck } from 'react-icons/fi'
-
-interface ProductVariant {
-  type: string;
-  price: number;
-  stock: number;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  variants: ProductVariant[];
-}
+import { Product, ProductVariant } from '../../../hooks/useSalesLogic'
 
 interface ProductModalProps {
   product: Product | null;

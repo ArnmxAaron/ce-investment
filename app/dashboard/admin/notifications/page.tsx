@@ -81,7 +81,7 @@ export default function NotificationsPage() {
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Processed By</p>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-black text-xs">
-                    {sale.staff_name?.substring(0,2).toUpperCase() || 'ST'}
+                     {selectedSale.staff_name?.substring(0,2).toUpperCase() || 'ST'}
                   </div>
                   <p className="font-black text-slate-900 uppercase text-sm">{selectedSale.staff_name || 'System Staff'}</p>
                 </div>

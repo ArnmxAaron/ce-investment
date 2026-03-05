@@ -1,3 +1,4 @@
+'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
@@ -10,6 +11,7 @@ export function useAdminDashboard(selectedDate: string) {
   })
   const [chartData, setChartData] = useState<any[]>([])
   const [recentSales, setRecentSales] = useState<any[]>([])
+  const [topProducts, setTopProducts] = useState<any[]>([]) // FIXED: Added missing state
   const [notifications, setNotifications] = useState<number>(0)
   const [loading, setLoading] = useState(true)
 
@@ -17,7 +19,7 @@ export function useAdminDashboard(selectedDate: string) {
     setLoading(true)
     
     // 1. Total Stock
-    const { data: products } = await supabase.from('products').select('stock_qty')
+    const { data: products } = await supabase.from('products').select('stock_qty, name, id')
     const totalStock = products?.reduce((acc, p) => acc + Number(p.stock_qty), 0) || 0
     const outOfStock = products?.filter(p => p.stock_qty <= 0).length || 0
 
@@ -36,7 +38,6 @@ export function useAdminDashboard(selectedDate: string) {
       .select('total_price, created_at')
       .order('created_at', { ascending: true })
 
-    // Simple grouping logic for chart
     const groups = weeklySales?.reduce((acc: any, sale) => {
       const date = new Date(sale.created_at).toLocaleDateString('en-US', { weekday: 'short' })
       acc[date] = (acc[date] || 0) + Number(sale.total_price)
@@ -51,6 +52,14 @@ export function useAdminDashboard(selectedDate: string) {
       .select('*, products(name), profiles(full_name)')
       .order('created_at', { ascending: false })
       .limit(8)
+
+    // 5. Top Products Logic (FIXED: Added this to satisfy the Admin Page)
+    // Here we fetch products with the lowest stock to show on the dashboard
+    const { data: topData } = await supabase
+      .from('products')
+      .select('*')
+      .order('stock_qty', { ascending: true })
+      .limit(5)
     
     setStats({
       dailyIncome: income,
@@ -60,6 +69,7 @@ export function useAdminDashboard(selectedDate: string) {
     })
     setChartData(formattedChart)
     setRecentSales(history || [])
+    setTopProducts(topData || []) // FIXED: Setting the top products state
     setLoading(false)
   }
 
@@ -78,5 +88,15 @@ export function useAdminDashboard(selectedDate: string) {
     return () => { supabase.removeChannel(channel) }
   }, [selectedDate])
 
-  return { stats, chartData, recentSales, notifications, setNotifications, loading, fetchData }
+  // FIXED: Added topProducts to the return object
+  return { 
+    stats, 
+    chartData, 
+    recentSales, 
+    topProducts, 
+    notifications, 
+    setNotifications, 
+    loading, 
+    fetchData 
+  }
 }

@@ -24,7 +24,7 @@ export const ProductCard = ({ item, onAdd }: ProductCardProps) => {
   const isLowStock = totalStock < 10;
   
   // 2. Image Handling
-  const publicImageUrl = getImageUrl(item.image_path);
+const publicImageUrl = getImageUrl(item.image_path ?? null);
 
   return (
     <div 

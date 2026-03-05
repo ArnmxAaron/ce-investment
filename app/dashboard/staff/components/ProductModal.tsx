@@ -15,6 +15,7 @@ export function ProductModal({ product, isOpen, onClose, onConfirm }: ProductMod
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
+  
   // Reset state when a new product is opened
   useEffect(() => {
     if (isOpen && product && product.variants?.length > 0) {

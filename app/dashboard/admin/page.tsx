@@ -11,8 +11,7 @@ export default function AdminHome() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   
   // Custom hook fetching your Supabase data
-  const { stats, chartData, recentSales, topProducts, loading } = useAdminDashboard(selectedDate)
-
+const { stats, chartData, recentSales, loading } = useAdminDashboard(selectedDate)
   return (
     <div className="max-w-screen-2xl mx-auto space-y-2">
       {/* 1. Header with Date Filter */}

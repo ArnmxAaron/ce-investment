@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FiX, FiPlus, FiMinus, FiShoppingBag, FiAlertCircle, FiCheck } from 'react-icons/fi'
-import { Product, ProductVariant } from '../../../hooks/useSalesLogic'
+import { Product, ProductVariant } from '@/hooks/useSalesLogic'
 
 interface ProductModalProps {
   product: Product | null;
@@ -15,7 +15,7 @@ export function ProductModal({ product, isOpen, onClose, onConfirm }: ProductMod
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
-  
+
   // Reset state when a new product is opened
   useEffect(() => {
     if (isOpen && product && product.variants?.length > 0) {

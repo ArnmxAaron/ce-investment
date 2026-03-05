@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient' // adjust to your path
+import { supabase } from '@/lib/supabase'
 
 export const getImageUrl = (path: string | null) => {
   if (!path) return null;

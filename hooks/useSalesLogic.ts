@@ -102,7 +102,7 @@ export function useSalesLogic() {
    * handleSale - Option A Implementation
    * Saves the entire transaction as a single row in the 'sales' table.
    */
- const handleSale = async (buyerName: string = "", buyerAddress: string = ""): Promise<boolean> => {
+ const handleSale = async (buyerName: string = "", buyerAddress: string = "", cart: CartItem[]): Promise<boolean> => {
     if (cart.length === 0) return false;
     setIsProcessing(true);
     

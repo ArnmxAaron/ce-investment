@@ -48,12 +48,13 @@ export default function StaffTerminal() {
     setCart((prev: CartItem[]) => prev.filter(item => item.id !== id));
   };
 
-  // --- RE-SYNCHRONIZED SALE HANDLER ---
+  // --- FIXED SALE HANDLER ---
   const onCompleteSale = async () => {
-    // 1. Send the current state to the hook
-    const success = await handleSale(buyerName, buyerAddress);
+    if (cart.length === 0) return;
+
+    // CRITICAL FIX: Added 'cart' as the 3rd argument so Supabase knows what items were sold
+    const success = await handleSale(buyerName, buyerAddress, cart); 
     
-    // 2. Only clear UI if the database update was successful
     if (success === true) {
       setCart([]);
       setBuyerName("");
@@ -61,9 +62,11 @@ export default function StaffTerminal() {
       setIsBuyerSet(false);
       setIsAnonymous(false);
       
-      // Refresh IDs and Views
+      // Refresh IDs and switch to Receipts view to see the new entry
       setTempId(new Date().getTime().toString().slice(-6));
       setActiveView('receipts'); 
+    } else {
+      alert("Failed to complete sale. Check database connection.");
     }
   };
 
@@ -105,7 +108,7 @@ export default function StaffTerminal() {
             {showBuyerEntry && (
               <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-slate-100 p-8">
-                  <div className="flex justify-between items-center mb-8">
+                  <div className="flex justify-between items-center mb-8 text-left">
                     <div className="flex items-center gap-3">
                       <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
                          <FiUser size={20} />
@@ -154,7 +157,7 @@ export default function StaffTerminal() {
 
             {/* PRODUCT GRID SECTION */}
             <div className="flex-1 p-6 md:p-10 overflow-y-auto h-screen custom-scrollbar bg-slate-50/50">
-              <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-10">
+              <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-10 text-left">
                 <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">
                   C & E <span className="text-blue-600 font-light border-l-2 border-slate-200 pl-4 not-italic uppercase">Inventory</span>
                 </h1>

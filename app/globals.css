@@ -78,3 +78,11 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-hover);
 }
+
+/* Force-hide any lingering modal overlays when they shouldn't be there */
+.modal-overlay {
+  pointer-events: none; /* Let clicks pass through */
+}
+.modal-overlay.is-active {
+  pointer-events: auto; /* Only capture clicks when active */
+}

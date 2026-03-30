@@ -5,90 +5,98 @@ import { supabase } from '@/lib/supabase'
 export function useAdminDashboard(selectedDate: string) {
   const [stats, setStats] = useState({
     dailyIncome: 0,
+    monthlySales: 0,
     totalOrders: 0,
-    totalStockItems: 0,
-    outOfStockCount: 0
+    totalProducts: 0
   })
   const [chartData, setChartData] = useState<any[]>([])
   const [recentSales, setRecentSales] = useState<any[]>([])
-  const [topProducts, setTopProducts] = useState<any[]>([]) // FIXED: Added missing state
+  const [topProducts, setTopProducts] = useState<any[]>([])
   const [notifications, setNotifications] = useState<number>(0)
   const [loading, setLoading] = useState(true)
 
   const fetchData = async () => {
     setLoading(true)
     
-    // 1. Total Stock
-    const { data: products } = await supabase.from('products').select('stock_qty, name, id')
-    const totalStock = products?.reduce((acc, p) => acc + Number(p.stock_qty), 0) || 0
-    const outOfStock = products?.filter(p => p.stock_qty <= 0).length || 0
+    try {
+      // 1. Get Date Ranges
+      const now = new Date()
+      const firstDayMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-    // 2. Sales for Selected Date
-    const { data: salesToday } = await supabase
-      .from('sales')
-      .select('total_price, created_at')
-      .gte('created_at', `${selectedDate}T00:00:00`)
-      .lte('created_at', `${selectedDate}T23:59:59`)
+      // 2. Fetch Sales Data (Both for the day and for the month)
+      const { data: monthSales } = await supabase
+        .from('sales')
+        .select('total_amount, created_at')
+        .gte('created_at', firstDayMonth)
 
-    const income = salesToday?.reduce((acc, s) => acc + Number(s.total_price), 0) || 0
+      // 3. Fetch Total Product Count
+      const { count: productCount } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
 
-    // 3. Chart Data (Last 7 Days)
-    const { data: weeklySales } = await supabase
-      .from('sales')
-      .select('total_price, created_at')
-      .order('created_at', { ascending: true })
+      // 4. Calculate Stats from monthSales
+      if (monthSales) {
+        // Today's specific totals (resets every day based on selectedDate)
+        const todaySales = monthSales.filter(s => s.created_at.startsWith(selectedDate))
+        
+        const todayIncome = todaySales.reduce((acc, s) => acc + (Number(s.total_amount) || 0), 0)
+        const monthlyTotal = monthSales.reduce((acc, s) => acc + (Number(s.total_amount) || 0), 0)
 
-    const groups = weeklySales?.reduce((acc: any, sale) => {
-      const date = new Date(sale.created_at).toLocaleDateString('en-US', { weekday: 'short' })
-      acc[date] = (acc[date] || 0) + Number(sale.total_price)
-      return acc
-    }, {})
-    
-    const formattedChart = Object.keys(groups || {}).map(key => ({ day: key, amount: groups[key] }))
+        setStats({
+          dailyIncome: todayIncome,
+          monthlySales: monthlyTotal,
+          totalOrders: todaySales.length,
+          totalProducts: productCount || 0
+        })
 
-    // 4. Recent Sales
-    const { data: history } = await supabase
-      .from('sales')
-      .select('*, products(name), profiles(full_name)')
-      .order('created_at', { ascending: false })
-      .limit(8)
+        // Format Chart Data (Last 7 distinct days)
+        const groups = monthSales.reduce((acc: any, sale) => {
+          const day = new Date(sale.created_at).toLocaleDateString('en-US', { weekday: 'short' })
+          acc[day] = (acc[day] || 0) + (Number(sale.total_amount) || 0)
+          return acc
+        }, {})
+        
+        setChartData(Object.keys(groups).map(key => ({ day: key, amount: groups[key] })))
+      }
 
-    // 5. Top Products Logic (FIXED: Added this to satisfy the Admin Page)
-    // Here we fetch products with the lowest stock to show on the dashboard
-    const { data: topData } = await supabase
-      .from('products')
-      .select('*')
-      .order('stock_qty', { ascending: true })
-      .limit(5)
-    
-    setStats({
-      dailyIncome: income,
-      totalOrders: salesToday?.length || 0,
-      totalStockItems: totalStock,
-      outOfStockCount: outOfStock
-    })
-    setChartData(formattedChart)
-    setRecentSales(history || [])
-    setTopProducts(topData || []) // FIXED: Setting the top products state
-    setLoading(false)
+      // 5. Fetch Recent Sales Feed
+      const { data: history } = await supabase
+        .from('sales')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(8)
+
+      // 6. Top Products (Low Stock Alerts)
+      const { data: lowStockProducts } = await supabase
+        .from('products')
+        .select('*')
+        .limit(5)
+
+      setRecentSales(history || [])
+      setTopProducts(lowStockProducts || [])
+
+    } catch (err) {
+      console.error("Dashboard Fetch Error:", err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
     fetchData()
 
-    // REAL-TIME NOTIFICATION LOGIC
+    // Real-time: Refresh when any sale is added
     const channel = supabase
-      .channel('realtime-sales')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, (payload) => {
+      .channel('admin-live-updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, () => {
         setNotifications(prev => prev + 1)
-        fetchData() // Refresh data when a sale happens
+        fetchData()
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [selectedDate])
 
-  // FIXED: Added topProducts to the return object
   return { 
     stats, 
     chartData, 

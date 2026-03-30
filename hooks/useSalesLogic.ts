@@ -2,7 +2,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 
-// 1. Updated Interfaces to match your new "Variants" structure
 export interface ProductVariant {
   type: string;
   price: number;
@@ -13,8 +12,8 @@ export interface Product {
   id: string;
   name: string;
   category: string;
-  image_path?: string; // Add this line!
-  variants: ProductVariant[]; // The array of sizes/types
+  image_path?: string;
+  variants: ProductVariant[];
 }
 
 export interface CartItem {
@@ -36,6 +35,7 @@ export function useSalesLogic() {
   const [newUpdate, setNewUpdate] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
+  // Clear toast after 3 seconds
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 3000)
@@ -43,7 +43,6 @@ export function useSalesLogic() {
     }
   }, [toast])
 
-  // 2. Updated Fetch Logic
   const fetchProducts = async () => {
     setLoading(true)
     const { data, error } = await supabase
@@ -52,7 +51,7 @@ export function useSalesLogic() {
       .order('name', { ascending: true })
     
     if (error) {
-      setToast({ message: "Error fetching data", type: 'error' })
+      setToast({ message: "Error fetching inventory", type: 'error' })
     } else {
       setProducts((data as Product[]) || [])
     }
@@ -73,15 +72,8 @@ export function useSalesLogic() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // 3. Updated addToCart to handle Variants
-  const addToCart = (
-    product: Product, 
-    quantity: number, 
-    price: number, 
-    variantType: string
-  ) => {
+  const addToCart = (product: Product, quantity: number, price: number, variantType: string) => {
     setCart(prev => {
-      // Create a unique key so we can have 5L and 20L of the same product in the cart separately
       const cartItemId = `${product.id}-${variantType}`
       const existing = prev.find(item => item.id === cartItemId)
 
@@ -106,53 +98,46 @@ export function useSalesLogic() {
     })
   }
 
-  // 4. Updated handleSale to update the specific variant stock
-  const handleSale = async () => {
-    if (cart.length === 0) return
-    setIsProcessing(true)
+  /**
+   * handleSale - Option A Implementation
+   * Saves the entire transaction as a single row in the 'sales' table.
+   */
+ const handleSale = async (buyerName: string = "", buyerAddress: string = ""): Promise<boolean> => {
+    if (cart.length === 0) return false;
+    setIsProcessing(true);
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      for (const item of cart) {
-        // Record the sale
-        await supabase.from('sales').insert([{ 
-          product_id: item.product_id, 
-          quantity: item.quantity, 
-          total_price: item.price * item.quantity, 
-          variant_sold: item.variant_type,
-          sold_by: user?.id 
-        }])
-        
-        // Update Stock Logic: Find the product, find the variant, subtract stock
-        const { data: currentProduct } = await supabase
-          .from('products')
-          .select('variants')
-          .eq('id', item.product_id)
-          .single()
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
 
-        if (currentProduct) {
-          const updatedVariants = currentProduct.variants.map((v: ProductVariant) => {
-            if (v.type === item.variant_type) {
-              return { ...v, stock: v.stock - item.quantity }
-            }
-            return v
-          })
+      const finalName = buyerName.trim() === "" ? "Walking Customer" : buyerName;
+      const finalAddress = buyerAddress.trim() === "" ? "N/A" : buyerAddress;
+      const totalTransactionAmount = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
-          await supabase.from('products')
-            .update({ variants: updatedVariants })
-            .eq('id', item.product_id)
-        }
-      }
+      // We call the server function. It handles BOTH the sale insert and stock deduction.
+      const { error } = await supabase.rpc('handle_staff_sale', {
+        p_buyer_name: finalName,
+        p_buyer_address: finalAddress,
+        p_total_amount: totalTransactionAmount,
+        p_items: cart, // The RPC expects the array of items
+        p_user_id: user.id
+      });
 
-      setToast({ message: "✅ Transaction Complete!", type: 'success' })
-      setCart([])
-      fetchProducts()
+      if (error) throw error;
+
+      setToast({ message: "✅ Transaction Complete!", type: 'success' });
+      setCart([]); 
+      await fetchProducts(); // Refresh local UI with new stock levels
+      return true;
+
     } catch (err: any) {
-      setToast({ message: "❌ Error: " + err.message, type: 'error' })
+      console.error("Sale Error:", err.message);
+      setToast({ message: "❌ Error: " + err.message, type: 'error' });
+      return false;
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => 
@@ -162,9 +147,20 @@ export function useSalesLogic() {
   }, [searchQuery, products])
 
   return { 
-    products, cart, setCart, searchQuery, setSearchQuery, 
-    loading, isprocessing, newUpdate, setNewUpdate, 
-    toast, setToast, fetchProducts, addToCart, 
-    handleSale, filteredProducts 
+    products, 
+    cart, 
+    setCart, 
+    searchQuery, 
+    setSearchQuery, 
+    loading, 
+    isprocessing, 
+    newUpdate, 
+    setNewUpdate, 
+    toast, 
+    setToast, 
+    fetchProducts, 
+    addToCart, 
+    handleSale, 
+    filteredProducts 
   }
 }

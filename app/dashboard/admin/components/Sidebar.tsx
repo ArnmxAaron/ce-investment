@@ -20,9 +20,8 @@ export const navItems = [
 export function Sidebar() {
   const pathname = usePathname()
   const [isLocked, setIsLocked] = useState(false)
+  const [isHovered, setIsHovered] = useState(false) // Trigger for expand/collapse
   const [security, setSecurity] = useState({ pin: '1234', timeout: 30000 })
-  
-  // Ref to store the timer - prevents the "clearTimeout is not a function" error
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
@@ -35,23 +34,14 @@ export function Sidebar() {
 
   const handleActivity = useCallback(() => {
     if (security.timeout === 0 || isLocked) return
-    
-    // Clear existing timer safely
-    if (idleTimerRef.current) {
-      clearTimeout(idleTimerRef.current)
-    }
-    
-    // Set new timer
-    idleTimerRef.current = setTimeout(() => {
-      setIsLocked(true)
-    }, security.timeout)
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    idleTimerRef.current = setTimeout(() => setIsLocked(true), security.timeout)
   }, [security.timeout, isLocked])
 
   useEffect(() => {
     const events = ['mousedown', 'mousemove', 'keypress', 'touchstart']
     events.forEach(e => window.addEventListener(e, handleActivity))
     handleActivity()
-    
     return () => {
       events.forEach(e => window.removeEventListener(e, handleActivity))
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
@@ -60,33 +50,58 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Reduced width from 80 to 72 for better scaling */}
-      <aside className="w-72 bg-black border-r border-slate-800 flex flex-col sticky top-0 h-screen z-[100]">
+      <motion.aside 
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        initial={false}
+        animate={{ width: isHovered ? 288 : 88 }} // 72 (w-72) vs 22 (icon only)
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="bg-black border-r border-slate-800 flex flex-col sticky top-0 h-screen z-[100] overflow-hidden whitespace-nowrap shadow-2xl"
+      >
         
-        {/* Scaled Header */}
+        {/* Header Section */}
         <div className="p-6 mb-2 bg-slate-900/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+          <div className="flex items-center gap-4">
+            <div className="min-w-[40px] h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg">
               <FiShield className="text-white text-xl" />
             </div>
-            <div>
-              <h2 className="text-lg font-black text-white italic tracking-tighter leading-none">C & E</h2>
-              <p className="text-[9px] text-blue-400 font-black uppercase tracking-[0.2em] mt-1">Admin System</p>
-            </div>
+            <AnimatePresence>
+              {isHovered && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }} 
+                  animate={{ opacity: 1, x: 0 }} 
+                  exit={{ opacity: 0, x: -10 }}
+                >
+                  <h2 className="text-lg font-black text-white italic tracking-tighter leading-none">C & E</h2>
+                  <p className="text-[9px] text-blue-400 font-black uppercase tracking-[0.2em] mt-1">Admin System</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        {/* Compact Navigation */}
-        <nav className="flex-1 px-3 space-y-1.5 overflow-y-auto custom-scrollbar">
+        {/* Navigation Items */}
+        <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto no-scrollbar">
           {navItems.map((item) => {
             const isActive = pathname === item.href
             return (
               <Link key={item.href} href={item.href} 
-                className={`relative flex items-center gap-4 px-4 py-3.5 rounded-xl font-bold transition-all duration-200 ${
+                className={`relative flex items-center gap-4 px-3 py-3.5 rounded-xl font-bold transition-all duration-200 ${
                   isActive ? 'text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}>
-                <span className="z-10">{item.icon}</span>
-                <span className="text-sm uppercase tracking-wide z-10">{item.name}</span>
+                <div className="min-w-[24px] flex justify-center z-10">{item.icon}</div>
+                <AnimatePresence>
+                  {isHovered && (
+                    <motion.span 
+                      initial={{ opacity: 0, x: -10 }} 
+                      animate={{ opacity: 1, x: 0 }} 
+                      exit={{ opacity: 0, x: -10 }}
+                      className="text-sm uppercase tracking-wide z-10"
+                    >
+                      {item.name}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
                 {isActive && (
                   <motion.div 
                     layoutId="activeNav" 
@@ -98,23 +113,32 @@ export function Sidebar() {
           })}
         </nav>
         
-        {/* Refined Lock Button */}
+        {/* Footer / Lock Button */}
         <button 
           onClick={() => setIsLocked(true)}
-          className="group flex items-center justify-between p-6 hover:bg-white/5 transition-all border-t border-slate-800"
+          className="group flex items-center gap-4 p-6 hover:bg-white/5 transition-all border-t border-slate-800"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-slate-900 rounded-lg flex items-center justify-center text-blue-500 group-hover:bg-blue-600 group-hover:text-white transition-all">
-              <FiUnlock size={16} />
-            </div>
-            <div className="text-left">
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Session</p>
-              <p className="text-xs font-black text-white uppercase italic">Active</p>
-            </div>
+          <div className="min-w-[36px] h-9 bg-slate-900 rounded-lg flex items-center justify-center text-blue-500 group-hover:bg-blue-600 group-hover:text-white transition-all">
+            <FiUnlock size={16} />
           </div>
-          <FiLock size={18} className="text-slate-600 group-hover:text-blue-500 transition-colors" />
+          <AnimatePresence>
+            {isHovered && (
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                exit={{ opacity: 0, x: -10 }}
+                className="flex flex-1 justify-between items-center"
+              >
+                <div className="text-left">
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Session</p>
+                  <p className="text-xs font-black text-white uppercase italic">Active</p>
+                </div>
+                <FiLock size={18} className="text-slate-600 group-hover:text-blue-500 transition-colors" />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </button>
-      </aside>
+      </motion.aside>
 
       <LockScreen 
         isOpen={isLocked} 

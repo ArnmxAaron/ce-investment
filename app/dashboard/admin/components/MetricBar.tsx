@@ -1,59 +1,75 @@
 'use client'
-import { FiDollarSign, FiShoppingBag, FiLayers, FiAlertCircle } from 'react-icons/fi'
+import { 
+  FiTrendingUp, 
+  FiShoppingBag, 
+  FiBox, 
+  FiLayers, 
+  FiArrowUpRight 
+} from 'react-icons/fi'
 
-export function MetricBar({ stats }: { stats: any }) {
-  // Safe mapping of stats to handle potential undefined values during loading
-  const items = [
-    { 
-      label: 'Daily Revenue', 
-      value: `NLe ${stats?.revenue?.toLocaleString() || 0}`, 
-      icon: <FiDollarSign />, 
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-50'
+interface MetricBarProps {
+  stats: {
+    revenue: number;      // Today's Income
+    monthlySales: number;  // Total Sales this month
+    totalOrders: number;   // Today's order count
+    totalProducts: number; // Total product count
+  }
+}
+
+export const MetricBar = ({ stats }: MetricBarProps) => {
+  const metrics = [
+    {
+      label: "Today's Revenue",
+      value: `NLE ${stats.revenue.toLocaleString()}`,
+      icon: <FiTrendingUp size={24} />,
+      color: "bg-emerald-500",
+      textColor: "text-emerald-600",
+      bgLight: "bg-emerald-50"
     },
-    { 
-      label: 'Orders Today', 
-      value: stats?.units || 0, 
-      icon: <FiShoppingBag />, 
-      color: 'text-blue-600',
-      bg: 'bg-blue-50'
+    {
+      label: "Total Sales (Month)",
+      value: `NLE ${stats.monthlySales.toLocaleString()}`,
+      icon: <FiShoppingBag size={24} />,
+      color: "bg-blue-500",
+      textColor: "text-blue-600",
+      bgLight: "bg-blue-50"
     },
-    { 
-      label: 'Live Inventory', 
-      value: stats?.inventory || 0, 
-      icon: <FiLayers />, 
-      color: 'text-slate-600',
-      bg: 'bg-slate-100'
+    {
+      label: "Orders Today",
+      value: stats.totalOrders,
+      icon: <FiLayers size={24} />,
+      color: "bg-violet-500",
+      textColor: "text-violet-600",
+      bgLight: "bg-violet-50"
     },
-    { 
-      label: 'Stock Alerts', 
-      value: stats?.alerts || 0, 
-      icon: <FiAlertCircle />, 
-      color: (stats?.alerts > 0) ? 'text-rose-600' : 'text-slate-400',
-      bg: (stats?.alerts > 0) ? 'bg-rose-50' : 'bg-slate-50'
-    },
+    {
+      label: "Total Products",
+      value: stats.totalProducts,
+      icon: <FiBox size={24} />,
+      color: "bg-orange-500",
+      textColor: "text-orange-600",
+      bgLight: "bg-orange-50"
+    }
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 py-10 border-b border-slate-100 bg-white">
-      {items.map((item, i) => (
-        <div key={i} className="flex flex-col group">
-          <div className="flex items-center gap-2 mb-3">
-            <div className={`p-2 rounded-lg ${item.bg} ${item.color} transition-colors group-hover:bg-slate-900 group-hover:text-white`}>
-              {item.icon}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 py-6">
+      {metrics.map((m, i) => (
+        <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 group">
+          <div className="flex justify-between items-start mb-4">
+            <div className={`p-4 rounded-2xl ${m.bgLight} ${m.textColor} group-hover:scale-110 transition-transform`}>
+              {m.icon}
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-              {item.label}
-            </p>
+            <div className="flex items-center gap-1 text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg">
+              <FiArrowUpRight /> +Live
+            </div>
           </div>
-          <p className={`text-3xl font-black tracking-tighter italic ${item.label === 'Stock Alerts' && stats?.alerts > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
-            {item.value}
-          </p>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{m.label}</p>
+            <p className="text-2xl font-black text-slate-900 tracking-tighter">{m.value}</p>
+          </div>
         </div>
       ))}
     </div>
   )
 }
-
-// Fallback default export to prevent resolution errors
-export default MetricBar;

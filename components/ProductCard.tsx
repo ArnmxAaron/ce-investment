@@ -22,7 +22,8 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
     name: item.name,
     price: item.variants?.[0]?.price || 0,
     stock: item.variants?.[0]?.stock || 0,
-    image_path: item.image_path
+    // Fix 1: Ensure image_path is at least null if undefined
+    image_path: item.image_path ?? null 
   })
 
   const getImageUrl = (path: string | null) => {
@@ -30,7 +31,8 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
     return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
   }
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(getImageUrl(item.image_path))
+  // Fix 2: Explicitly handle the potential 'undefined' from item.image_path
+  const [previewUrl, setPreviewUrl] = useState<string | null>(getImageUrl(item.image_path ?? null))
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -49,13 +51,18 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
     }
   }
 
-  const handleSave = async () => {
+ const handleSave = async () => {
     setLoading(true)
     try {
-      await updateProduct(item.id, item.variants[0].id, editForm)
+      // We use a "type assertion" (as any) or (as {id: string}) 
+      // to tell TypeScript the ID is definitely there.
+      const variantId = (item.variants[0] as any).id; 
+      
+      await updateProduct(item.id, variantId, editForm)
       setIsEditing(false)
       window.location.reload()
     } catch (err) {
+      console.error(err)
       alert("Update failed")
     } finally {
       setLoading(false)
@@ -65,7 +72,7 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
   const currentStock = item.variants?.[0]?.stock || 0;
 
   return (
-    <div className="group relative bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm hover:shadow-xl transition-all flex flex-col overflow-hidden">
+    <div className="group relative bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm hover:shadow-xl transition-all flex flex-col overflow-hidden text-left">
       
       {/* 1. IMAGE SECTION */}
       <div className="relative aspect-square bg-slate-50 rounded-2xl mb-4 flex items-center justify-center overflow-hidden">
@@ -75,7 +82,6 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
           <div className="text-slate-200"><FiImage size={48} /></div>
         )}
 
-        {/* Admin floating Edit/Delete buttons */}
         {isAdmin && (
           <div className="absolute top-2 right-2 flex flex-col gap-2 translate-x-12 group-hover:translate-x-0 transition-transform duration-300">
             <button onClick={() => setIsEditing(!isEditing)} className="p-2 bg-white shadow-lg rounded-xl text-slate-600 hover:bg-slate-900 hover:text-white transition-all">
@@ -113,7 +119,6 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
           </h3>
         )}
 
-        {/* PRICE & STOCK BLOCK */}
         <div className="flex justify-between items-end mt-auto pt-4">
           <div className="flex flex-col">
             <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Price</span>
@@ -151,7 +156,6 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
           </div>
         </div>
 
-        {/* ACTION BUTTON */}
         <button 
           onClick={() => isEditing ? handleSave() : onAdd(item)}
           className={`w-full mt-5 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-2
@@ -163,7 +167,7 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
         </button>
       </div>
 
-      {/* DELETE CONFIRMATION OVERLAY */}
+      {/* DELETE CONFIRMATION */}
       {showConfirmDelete && (
         <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
           <div className="bg-rose-500/20 p-4 rounded-full mb-4">

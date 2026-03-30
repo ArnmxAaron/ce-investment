@@ -16,10 +16,6 @@ export function Cart({ cart, total, onEditItem, onClearCart, onCheckout }: Props
   const [buyerName, setBuyerName] = useState('');
   const [buyerAddress, setBuyerAddress] = useState('');
 
-  const handlePrint = () => {
-    window.print(); // Triggers the print dialog
-  };
-
   return (
     <div className="h-full flex flex-col bg-white border-l border-slate-200 shadow-2xl overflow-hidden">
       {/* HEADER */}
@@ -29,7 +25,11 @@ export function Cart({ cart, total, onEditItem, onClearCart, onCheckout }: Props
             <h2 className="text-xl font-black uppercase tracking-tighter italic">C & E Investment</h2>
             <p className="text-[10px] text-slate-400 uppercase font-bold">Proforma / Invoice System</p>
           </div>
-          <button onClick={onClearCart} className="p-2 text-slate-400 hover:text-rose-400 transition-colors">
+          <button 
+            onClick={onClearCart} 
+            className="p-2 text-slate-400 hover:text-rose-400 transition-colors"
+            title="Clear All"
+          >
             <FiTrash2 size={18} />
           </button>
         </div>
@@ -58,7 +58,7 @@ export function Cart({ cart, total, onEditItem, onClearCart, onCheckout }: Props
       </div>
 
       {/* ITEMS LIST */}
-      <div className="flex-1 overflow-y-auto print:overflow-visible">
+      <div className="flex-1 overflow-y-auto">
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-10 text-center opacity-20">
             <div className="w-16 h-16 border-4 border-dashed border-slate-300 rounded-full mb-4" />
@@ -67,7 +67,14 @@ export function Cart({ cart, total, onEditItem, onClearCart, onCheckout }: Props
         ) : (
           <div className="divide-y divide-slate-50">
             {cart.map((item) => (
-              <CartItemRow key={item.id} item={item} onEdit={onEditItem} />
+              <CartItemRow 
+                key={item.id} 
+                item={item} 
+                // We pass the logic required by CartItemRow's props
+                onIncrease={() => onEditItem({ ...item, quantity: item.quantity + 1 })}
+                onDecrease={() => onEditItem({ ...item, quantity: Math.max(1, item.quantity - 1) })}
+                onRemove={() => onEditItem({ ...item, quantity: 0 })} // Setting qty to 0 usually triggers removal in useSalesLogic
+              />
             ))}
           </div>
         )}
@@ -78,7 +85,7 @@ export function Cart({ cart, total, onEditItem, onClearCart, onCheckout }: Props
         <div className="flex justify-between items-end mb-6">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total</p>
           <div className="text-right">
-            <p className="text-[10px] font-black text-blue-600 uppercase">Sierra Leone Leones</p>
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-tight">Sierra Leone Leones</p>
             <p className="text-3xl font-black text-slate-900 tracking-tighter italic">
               NLe {total.toLocaleString()}
             </p>
@@ -88,7 +95,7 @@ export function Cart({ cart, total, onEditItem, onClearCart, onCheckout }: Props
         <button 
           onClick={() => onCheckout({ name: buyerName, address: buyerAddress })}
           disabled={cart.length === 0}
-          className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-slate-200 hover:bg-blue-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:bg-slate-200 disabled:shadow-none"
+          className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl shadow-slate-200 hover:bg-blue-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:bg-slate-200 disabled:shadow-none disabled:text-slate-400"
         >
           <FiPrinter size={18} /> Print Proforma
         </button>

@@ -7,6 +7,7 @@ import { InventoryHeader } from './components/InventoryHeader'
 import { InventorySidebar } from './components/InventorySidebar'
 import { useInventoryActions } from './useInventoryActions'
 import { useInventoryUndo } from './useInventoryUndo'
+import { FiRefreshCw } from 'react-icons/fi'
 
 export default function InventoryPage() {
   const [products, setProducts] = useState<any[]>([])
@@ -14,6 +15,7 @@ export default function InventoryPage() {
   const [showOnlyZero, setShowOnlyZero] = useState(false)
   const [loading, setLoading] = useState(false)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [newUpdate, setNewUpdate] = useState(false)
   const [userRole, setUserRole] = useState<'admin' | 'staff'>('admin')
 
   const { executeCleanup, executeBulkImport, executeManualAdd } = useInventoryActions(fetchInventory)
@@ -33,13 +35,9 @@ export default function InventoryPage() {
     )
   }, [])
 
-  useEffect(() => { 
-    fetchInventory() 
-  }, [])
-
+  // --- RE-FETCH LOGIC ---
   async function fetchInventory() {
     try {
-      if (products.length === 0) setIsInitialLoading(true)
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -59,6 +57,9 @@ export default function InventoryPage() {
       })
 
       setProducts(processedData)
+      
+      // Auto-hide the sync indicator after 3 seconds
+      setTimeout(() => setNewUpdate(false), 3000)
     } catch (err) {
       console.error("Fetch error:", err)
     } finally {
@@ -66,25 +67,61 @@ export default function InventoryPage() {
     }
   }
 
-  // --- REPLACEMENT ACTIONS (Instant execution, no modal) ---
+  // --- REAL-TIME DUAL SUBSCRIPTION ---
+  useEffect(() => { 
+    fetchInventory() 
+
+    // 1. Listen for Inventory changes (Manual Edits)
+    const productChannel = supabase
+      .channel('admin-inventory-live-sync')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'products' 
+      }, (payload) => {
+        console.log("Product update detected")
+        setNewUpdate(true)
+        fetchInventory() 
+      })
+      .subscribe()
+
+    // 2. Listen for Sales changes (Staff Receipts)
+    // This ensures stock levels refresh as soon as a receipt is generated
+    const salesChannel = supabase
+      .channel('admin-sales-sync')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'sales' 
+      }, (payload) => {
+        console.log("New Sale recorded! Refreshing stock levels...")
+        setNewUpdate(true)
+        fetchInventory() 
+      })
+      .subscribe()
+
+    return () => { 
+        supabase.removeChannel(productChannel)
+        supabase.removeChannel(salesChannel)
+    }
+  }, [])
+
+  // --- HANDLERS ---
   const handleManualAdd = async (name: string, variants: any) => {
     setLoading(true)
     await executeManualAdd(name, variants, setLoading)
-    await fetchInventory()
     setLoading(false)
   }
 
   const handleBulkImport = async (wb: any) => {
     setLoading(true)
     await executeBulkImport(wb, setLoading)
-    await fetchInventory()
     setLoading(false)
   }
 
   const handleCleanup = async () => {
     setLoading(true)
     await executeCleanup(setLoading)
-    await fetchInventory()
     setLoading(false)
   }
 
@@ -93,7 +130,7 @@ export default function InventoryPage() {
       .filter(p => {
         if (!p || !p.name) return false;
         const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase())
-        const hasZeroStock = Array.isArray(p.variants) && p.variants.some((v: any) => v.stock === 0)
+        const hasZeroStock = Array.isArray(p.variants) && p.variants.some((v: any) => v.stock <= 0)
         return showOnlyZero ? (matchesSearch && hasZeroStock) : matchesSearch
       })
       .filter((p, i, self) => 
@@ -110,6 +147,21 @@ export default function InventoryPage() {
         setShowOnlyZero={setShowOnlyZero} 
         products={products} 
       />
+
+      {/* Real-time Status Indicator */}
+      <AnimatePresence>
+        {newUpdate && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="absolute top-24 right-10 z-[100] bg-blue-600 text-white px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-2xl border border-white/20"
+          >
+            <FiRefreshCw className="animate-spin text-sm" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Live Sync Active</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       <div className="flex flex-1 overflow-hidden w-full">
         <aside className="hidden md:block w-72 lg:w-80 xl:w-96 border-r bg-white overflow-y-auto">
@@ -124,7 +176,7 @@ export default function InventoryPage() {
         </aside>
         
         <main className="flex-1 h-full overflow-y-auto p-4 md:p-8 lg:p-10 w-full bg-slate-50/50">
-          <div className="max-w-400 mx-auto">
+          <div className="max-w-[1400px] mx-auto text-left">
             {isInitialLoading ? (
               <div className="flex justify-center p-20">
                 <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -152,14 +204,14 @@ export default function InventoryPage() {
             initial={{ y: 100, x: "-50%", opacity: 0 }} 
             animate={{ y: 0, x: "-50%", opacity: 1 }} 
             exit={{ y: 100, x: "-50%", opacity: 0 }}
-            className={`fixed bottom-10 left-1/2 z-1000 w-[90%] max-w-95 ${errorMessage ? 'bg-rose-600' : 'bg-slate-900'} text-white rounded-3xl shadow-2xl overflow-hidden border border-white/10`}
+            className={`fixed bottom-10 left-1/2 z-[1000] w-[90%] max-w-md ${errorMessage ? 'bg-rose-600' : 'bg-slate-900'} text-white rounded-3xl shadow-2xl overflow-hidden border border-white/10`}
           >
             <div className="p-5 flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">
                   {errorMessage ? 'System Error' : 'Removing Item'}
                 </span>
-                <span className="text-sm font-bold truncate max-w-55">
+                <span className="text-sm font-bold truncate max-w-[200px]">
                   {errorMessage ? errorMessage : undoItem?.name}
                 </span>
               </div>
@@ -183,10 +235,8 @@ export default function InventoryPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL SECTION REMOVED */}
-
       {loading && (
-        <div className="fixed inset-0 bg-white/40 backdrop-blur-[2px] z-9999 flex items-center justify-center">
+        <div className="fixed inset-0 bg-white/40 backdrop-blur-[2px] z-[9999] flex items-center justify-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
       )}

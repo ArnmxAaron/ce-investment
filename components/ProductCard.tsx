@@ -1,9 +1,9 @@
 'use client'
-import { useState, useRef } from 'react'
-import { Product } from '../hooks/useSalesLogic'
+import { useState, useRef, useMemo } from 'react'
+import { Product, Variant } from '../hooks/useSalesLogic'
 import { FiImage, FiEdit3, FiCheck, FiX, FiPlus, FiCamera, FiLoader, FiTrash2, FiAlertCircle } from 'react-icons/fi'
 import { supabase } from '@/lib/supabase'
-import { updateProduct, deleteProduct } from '@/lib/productService'
+import { deleteProduct } from '@/lib/productService'
 
 interface ProductCardProps {
   item: Product;
@@ -18,20 +18,31 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Initialize form state
   const [editForm, setEditForm] = useState({
     name: item.name,
     price: item.variants?.[0]?.price || 0,
     stock: item.variants?.[0]?.stock || 0,
-    // Fix 1: Ensure image_path is at least null if undefined
     image_path: item.image_path ?? null 
   })
+
+  // --- CALCULATION LOGIC ---
+  const totalStock = useMemo(() => {
+    if (!item.variants || !Array.isArray(item.variants)) return 0;
+    return item.variants.reduce((acc, v) => acc + (Number(v?.stock) || 0), 0);
+  }, [item.variants]);
+
+  const displayPrice = useMemo(() => {
+    if (!item.variants || item.variants.length === 0) return 0;
+    const prices = item.variants.map(v => Number(v.price)).filter(p => !isNaN(p));
+    return prices.length > 0 ? Math.min(...prices) : 0;
+  }, [item.variants]);
 
   const getImageUrl = (path: string | null) => {
     if (!path) return null
     return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
   }
 
-  // Fix 2: Explicitly handle the potential 'undefined' from item.image_path
   const [previewUrl, setPreviewUrl] = useState<string | null>(getImageUrl(item.image_path ?? null))
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,36 +56,57 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
       setEditForm(prev => ({ ...prev, image_path: filePath }))
       setPreviewUrl(getImageUrl(filePath))
     } catch (err) {
-      alert('Upload failed')
+      console.error('Upload failed', err)
     } finally {
       setUploading(false)
     }
   }
 
- const handleSave = async () => {
+  const handleSave = async () => {
     setLoading(true)
     try {
-      // We use a "type assertion" (as any) or (as {id: string}) 
-      // to tell TypeScript the ID is definitely there.
-      const variantId = (item.variants[0] as any).id; 
+      // 1. Prepare the variants array (modifying the first one)
+      const currentVariants = Array.isArray(item.variants) ? item.variants : [];
+      const updatedVariants = [...currentVariants];
       
-      await updateProduct(item.id, variantId, editForm)
-      setIsEditing(false)
-      window.location.reload()
-    } catch (err) {
-      console.error(err)
-      alert("Update failed")
-    } finally {
-      setLoading(false)
-    }
-  }
+      if (updatedVariants.length > 0) {
+        // Use 'any' to avoid the strict 'type' property error
+        const firstVariant: any = { ...updatedVariants[0] };
+        firstVariant.price = Number(editForm.price);
+        firstVariant.stock = Number(editForm.stock);
+        
+        // Ensure "type" exists if it was there before (for JSONB structure)
+        if (!firstVariant.type && firstVariant.name) {
+          firstVariant.type = firstVariant.name;
+        }
+        
+        updatedVariants[0] = firstVariant;
+      }
 
-  const currentStock = item.variants?.[0]?.stock || 0;
+      // 2. Update Supabase
+      const { error } = await supabase
+        .from('products')
+        .update({
+          name: editForm.name,
+          image_path: editForm.image_path,
+          variants: updatedVariants 
+        })
+        .eq('id', item.id);
+
+      if (error) throw error;
+      setIsEditing(false);
+    } catch (err: any) {
+      console.error(err);
+      alert("Update failed: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="group relative bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm hover:shadow-xl transition-all flex flex-col overflow-hidden text-left">
+    <div className="group relative bg-white rounded-4xl p-5 border border-slate-100 shadow-sm hover:shadow-xl transition-all flex flex-col overflow-hidden text-left h-full">
       
-      {/* 1. IMAGE SECTION */}
+      {/* IMAGE SECTION */}
       <div className="relative aspect-square bg-slate-50 rounded-2xl mb-4 flex items-center justify-center overflow-hidden">
         {previewUrl ? (
           <img src={previewUrl} alt={item.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
@@ -105,7 +137,7 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
         )}
       </div>
 
-      {/* 2. INFO SECTION */}
+      {/* INFO SECTION */}
       <div className="flex flex-col flex-1">
         {isEditing ? (
           <input 
@@ -119,9 +151,11 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
           </h3>
         )}
 
-        <div className="flex justify-between items-end mt-auto pt-4">
+        <div className="flex justify-between items-end mt-auto pt-4 border-t border-slate-50">
           <div className="flex flex-col">
-            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Price</span>
+            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">
+              {(item.variants?.length || 0) > 1 && !isEditing ? 'From Price' : 'Price'}
+            </span>
             <div className="flex items-center gap-1">
               <span className="text-[10px] font-bold text-blue-600">NLE</span>
               {isEditing ? (
@@ -133,14 +167,16 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
                 />
               ) : (
                 <span className="text-2xl font-black text-slate-900 leading-none tracking-tighter">
-                  {item.variants?.[0]?.price}
+                  {displayPrice.toLocaleString()}
                 </span>
               )}
             </div>
           </div>
 
           <div className="text-right flex flex-col items-end">
-            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Stock</span>
+            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">
+              {(item.variants?.length || 0) > 1 && !isEditing ? 'Total Stock' : 'Stock'}
+            </span>
             {isEditing ? (
               <input 
                 type="number" 
@@ -149,8 +185,8 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
                 onChange={e => setEditForm({...editForm, stock: Number(e.target.value)})}
               />
             ) : (
-              <span className={`text-lg font-black leading-none ${currentStock <= 5 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                {currentStock}
+              <span className={`text-lg font-black leading-none ${totalStock <= 5 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                {totalStock}
               </span>
             )}
           </div>
@@ -173,17 +209,24 @@ export const ProductCard = ({ item, onAdd, isAdmin = false }: ProductCardProps) 
           <div className="bg-rose-500/20 p-4 rounded-full mb-4">
             <FiAlertCircle className="text-rose-500" size={32}/>
           </div>
-          <p className="text-white font-black text-xs uppercase tracking-widest mb-6">Permanently delete this product?</p>
+          <p className="text-white font-black text-xs uppercase tracking-widest mb-6">Soft delete this product?</p>
           <div className="flex flex-col w-full gap-2">
             <button 
+              disabled={loading}
               onClick={async () => { 
                 setLoading(true); 
-                await deleteProduct(item.id, item.image_path); 
-                window.location.reload(); 
+                try {
+                   await deleteProduct(item.id, item.image_path); 
+                   setShowConfirmDelete(false);
+                } catch (e) {
+                   alert("Delete failed");
+                } finally {
+                   setLoading(false);
+                }
               }} 
-              className="bg-rose-600 text-white w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest"
+              className="bg-rose-600 text-white w-full py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest disabled:opacity-50"
             >
-              Confirm Delete
+              {loading ? "Deleting..." : "Confirm Delete"}
             </button>
             <button onClick={() => setShowConfirmDelete(false)} className="text-slate-400 font-bold text-[10px] uppercase tracking-widest py-2">
               Cancel

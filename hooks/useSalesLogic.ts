@@ -1,11 +1,15 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
-export interface ProductVariant {
-  type: string;
+export interface Variant {
+  id: string;
+  product_id: string;
+  name: string;   
   price: number;
   stock: number;
+  type?: string;  
+  [key: string]: any; 
 }
 
 export interface Product {
@@ -13,14 +17,15 @@ export interface Product {
   name: string;
   category: string;
   image_path?: string;
-  variants: ProductVariant[];
+  is_deleted: boolean;
+  variants: Variant[];
 }
 
 export interface CartItem {
-  id: string;         // Unique ID (product.id + variant.type)
-  product_id: string; // Original database ID
-  name: string;
-  variant_type: string;
+  id: string;          
+  product_id: string;  
+  name: string;        
+  variant_name: string; 
   quantity: number;
   price: number;
   category: string;
@@ -31,108 +36,100 @@ export function useSalesLogic() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
-  const [isprocessing, setIsProcessing] = useState(false)
-  const [newUpdate, setNewUpdate] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
-  // Clear toast after 3 seconds
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 3000)
-      return () => clearTimeout(timer)
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select(`id, name, category, image_path, is_deleted, variants`)
+        .or('is_deleted.is.null,is_deleted.eq.false')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+
+      const mappedProducts = (data as any[] || []).map(p => {
+        const mappedVariants = (p.variants || []).map((v: any, index: number) => ({
+          id: v.id || `${p.id}-${index}`, 
+          product_id: p.id,
+          name: v.name || v.type || 'Standard', 
+          price: Number(v.price) || 0,
+          stock: Number(v.stock) || 0
+        }));
+        return { ...p, variants: mappedVariants };
+      });
+
+      setProducts(mappedProducts.filter(p => p.variants.length > 0));
+    } catch (err: any) {
+      console.error("Fetch Error:", err.message);
+    } finally {
+      setLoading(false);
     }
-  }, [toast])
-
-  const fetchProducts = async () => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('name', { ascending: true })
-    
-    if (error) {
-      setToast({ message: "Error fetching inventory", type: 'error' })
-    } else {
-      setProducts((data as Product[]) || [])
-    }
-    setLoading(false)
-    setNewUpdate(false)
-  }
+  }, []);
 
   useEffect(() => {
-    fetchProducts()
-    
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        setNewUpdate(true)
-      })
-      .subscribe()
+    fetchProducts();
+  }, [fetchProducts]);
 
-    return () => { supabase.removeChannel(channel) }
-  }, [])
+  const totalAmount = useMemo(() => 
+    cart.reduce((sum, item) => sum + (item.price * item.quantity), 0), 
+  [cart]);
 
-  const addToCart = (product: Product, quantity: number, price: number, variantType: string) => {
+  const addToCart = (product: Product, variant: Variant, quantity: number) => {
+    if (variant.stock < quantity) {
+      setToast({ message: "Insufficient stock!", type: 'error' });
+      return;
+    }
+
     setCart(prev => {
-      const cartItemId = `${product.id}-${variantType}`
-      const existing = prev.find(item => item.id === cartItemId)
-
-      if (existing) {
-        return prev.map(item => 
-          item.id === cartItemId 
-            ? { ...item, quantity: item.quantity + quantity } 
-            : item
-        )
-      }
+      const existing = prev.find(item => item.id === variant.id);
       
-      const newItem: CartItem = {
-        id: cartItemId,
+      if (existing) {
+        if (existing.quantity + quantity > variant.stock) {
+          setToast({ message: "Limited stock available", type: 'error' });
+          return prev;
+        }
+        return prev.map(item => 
+          item.id === variant.id ? { ...item, quantity: item.quantity + quantity } : item
+        );
+      }
+
+      // CRITICAL: We include name and variant_name here for the database/receipt
+      return [...prev, {
+        id: variant.id,
         product_id: product.id,
         name: product.name,
-        variant_type: variantType,
-        quantity: quantity,
-        price: price,
+        variant_name: variant.name,
+        quantity,
+        price: variant.price,
         category: product.category
-      }
-      return [...prev, newItem]
-    })
-  }
+      }];
+    });
+  };
 
-  /**
-   * handleSale - Option A Implementation
-   * Saves the entire transaction as a single row in the 'sales' table.
-   */
- const handleSale = async (buyerName: string = "", buyerAddress: string = "", cart: CartItem[]): Promise<boolean> => {
+  const handleSale = async (buyerName: string, buyerAddress: string) => {
     if (cart.length === 0) return false;
     setIsProcessing(true);
-    
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
-
-      const finalName = buyerName.trim() === "" ? "Walking Customer" : buyerName;
-      const finalAddress = buyerAddress.trim() === "" ? "N/A" : buyerAddress;
-      const totalTransactionAmount = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-
-      // We call the server function. It handles BOTH the sale insert and stock deduction.
-      const { error } = await supabase.rpc('handle_staff_sale', {
-        p_buyer_name: finalName,
-        p_buyer_address: finalAddress,
-        p_total_amount: totalTransactionAmount,
-        p_items: cart, // The RPC expects the array of items
-        p_user_id: user.id
+      const { error } = await supabase.rpc('process_sale_transaction', {
+        p_buyer_name: buyerName || "Walking Customer",
+        p_buyer_address: buyerAddress || "N/A",
+        p_total_amount: totalAmount, 
+        p_items: cart 
       });
 
       if (error) throw error;
 
-      setToast({ message: "✅ Transaction Complete!", type: 'success' });
-      setCart([]); 
-      await fetchProducts(); // Refresh local UI with new stock levels
-      return true;
-
+      setCart([]);
+      setToast({ message: "Sale completed!", type: 'success' });
+      await fetchProducts();
+      return true; 
     } catch (err: any) {
       console.error("Sale Error:", err.message);
-      setToast({ message: "❌ Error: " + err.message, type: 'error' });
+      setToast({ message: "Error: " + err.message, type: 'error' });
       return false;
     } finally {
       setIsProcessing(false);
@@ -140,27 +137,17 @@ export function useSalesLogic() {
   };
 
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return products.filter(p => 
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [searchQuery, products])
+      p.name.toLowerCase().includes(q) ||
+      p.category?.toLowerCase().includes(q)
+    );
+  }, [searchQuery, products]);
 
   return { 
-    products, 
-    cart, 
-    setCart, 
-    searchQuery, 
-    setSearchQuery, 
-    loading, 
-    isprocessing, 
-    newUpdate, 
-    setNewUpdate, 
-    toast, 
-    setToast, 
-    fetchProducts, 
-    addToCart, 
-    handleSale, 
-    filteredProducts 
-  }
+    products, cart, setCart, searchQuery, setSearchQuery, 
+    loading, isProcessing, toast, setToast, 
+    fetchProducts, addToCart, handleSale, filteredProducts,
+    totalAmount 
+  };
 }

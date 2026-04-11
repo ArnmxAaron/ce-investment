@@ -45,7 +45,6 @@ export function InventoryList({
     setLocalVariants(product.variants || [])
   }, [product.variants])
 
-  // --- IMAGE HELPERS ---
   const getImageUrl = (path: string | undefined) => {
     if (!path) return null
     const { data } = supabase.storage.from('product-images').getPublicUrl(path)
@@ -73,13 +72,12 @@ export function InventoryList({
     } finally { setIsSaving(false) }
   }
 
-  // --- DATABASE SYNC ---
   const saveToSupabase = async (variantsToSave: Variant[]) => {
     setIsSaving(true)
     try {
       const { data, error } = await supabase
         .from('products')
-        .update({ variants: variantsToSave }) // Only update existing 'variants' column
+        .update({ variants: variantsToSave })
         .eq('id', product.id)
         .select()
         .single()
@@ -96,7 +94,6 @@ export function InventoryList({
     }
   }
 
-  // --- VARIANT ACTIONS ---
   const handleUpdate = async (index: number, field: keyof Variant, value: string | number) => {
     if (!isAdmin) return;
     const updatedVariants = [...localVariants]
@@ -135,7 +132,6 @@ export function InventoryList({
         )}
       </AnimatePresence>
 
-      {/* HEADER */}
       <div className="bg-[#0F172A] p-6 text-white relative shrink-0">
         <div className="flex items-start gap-4">
           <div className="relative shrink-0">
@@ -155,7 +151,8 @@ export function InventoryList({
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-black uppercase tracking-tight truncate mb-3">{product.name}</h3>
+            {/* FIX: Fallback for product name */}
+            <h3 className="text-xl font-black uppercase tracking-tight truncate mb-3">{product.name ?? "UNNAMED PRODUCT"}</h3>
             <div className="flex gap-2">
               <div className="bg-white/5 border border-white/10 px-2 py-1.5 rounded-xl">
                 <p className="text-[7px] text-slate-500 font-black uppercase">Stock</p>
@@ -171,7 +168,6 @@ export function InventoryList({
         </div>
       </div>
 
-      {/* BODY */}
       <div className="p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar relative">
         {localVariants.map((variant, idx) => (
           <div key={idx} className="bg-slate-50 border border-slate-100 p-4 rounded-[2rem] relative group/variant">
@@ -183,7 +179,8 @@ export function InventoryList({
              <div className="mb-3">
                 <input 
                   disabled={!isAdmin}
-                  value={variant.type}
+                  // FIX: Use fallback for variant type string
+                  value={variant.type ?? ""}
                   onChange={(e) => {
                     const updated = [...localVariants];
                     updated[idx].type = e.target.value;
@@ -198,7 +195,8 @@ export function InventoryList({
                 <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Price</label>
                 <input 
                   type="number" 
-                  value={variant.price} 
+                  // FIX: Use fallback for price number
+                  value={variant.price ?? 0} 
                   disabled={!isAdmin}
                   onChange={(e) => {
                     const updated = [...localVariants];
@@ -213,7 +211,8 @@ export function InventoryList({
                 <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Stock</label>
                 <input 
                   type="number" 
-                  value={variant.stock} 
+                  // FIX: Use fallback for stock number
+                  value={variant.stock ?? 0} 
                   disabled={!isAdmin}
                   onChange={(e) => {
                     const updated = [...localVariants];
@@ -228,7 +227,6 @@ export function InventoryList({
           </div>
         ))}
 
-        {/* ADD VARIANT BUTTON */}
         {isAdmin && (
           <button 
             onClick={addVariant}
@@ -239,7 +237,6 @@ export function InventoryList({
           </button>
         )}
         
-        {/* Scroll Indicator */}
         {localVariants.length > 2 && (
           <div className="sticky bottom-0 left-0 right-0 flex justify-center pb-2 pointer-events-none">
             <div className="bg-white/80 backdrop-blur p-1 rounded-full border shadow-sm animate-bounce">

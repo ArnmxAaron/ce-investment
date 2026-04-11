@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export function useAdminDashboard(selectedDate: string) {
@@ -15,87 +15,113 @@ export function useAdminDashboard(selectedDate: string) {
   const [notifications, setNotifications] = useState<number>(0)
   const [loading, setLoading] = useState(true)
 
-  const fetchData = async () => {
-    setLoading(true)
-    
+  const fetchData = useCallback(async () => {
     try {
-      // 1. Get Date Ranges
       const now = new Date()
       const firstDayMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-      // 2. Fetch Sales Data (Both for the day and for the month)
-      const { data: monthSales } = await supabase
-        .from('sales')
-        .select('total_amount, created_at')
+      // 1. Fetch Receipts (Replacing 'sales')
+      const { data: monthReceipts } = await supabase
+        .from('receipts')
+        .select('total_amount, created_at, buyer_name')
         .gte('created_at', firstDayMonth)
 
-      // 3. Fetch Total Product Count
-      const { count: productCount } = await supabase
+      // 2. Fetch All Products with Variants for proper stock calculation
+      const { data: allProducts, count: productCount } = await supabase
         .from('products')
-        .select('*', { count: 'exact', head: true })
+        .select('*, variants(*)')
 
-      // 4. Calculate Stats from monthSales
-      if (monthSales) {
-        // Today's specific totals (resets every day based on selectedDate)
-        const todaySales = monthSales.filter(s => s.created_at.startsWith(selectedDate))
+      // 3. Process Receipt Stats
+      if (monthReceipts) {
+        const todayReceipts = monthReceipts.filter(r => r.created_at.startsWith(selectedDate))
         
-        const todayIncome = todaySales.reduce((acc, s) => acc + (Number(s.total_amount) || 0), 0)
-        const monthlyTotal = monthSales.reduce((acc, s) => acc + (Number(s.total_amount) || 0), 0)
+        const todayIncome = todayReceipts.reduce((acc, r) => acc + (Number(r.total_amount) || 0), 0)
+        const monthlyTotal = monthReceipts.reduce((acc, r) => acc + (Number(r.total_amount) || 0), 0)
 
-        setStats({
+        setStats(prev => ({
+          ...prev,
           dailyIncome: todayIncome,
           monthlySales: monthlyTotal,
-          totalOrders: todaySales.length,
+          totalOrders: todayReceipts.length,
           totalProducts: productCount || 0
-        })
+        }))
 
-        // Format Chart Data (Last 7 distinct days)
-        const groups = monthSales.reduce((acc: any, sale) => {
-          const day = new Date(sale.created_at).toLocaleDateString('en-US', { weekday: 'short' })
-          acc[day] = (acc[day] || 0) + (Number(sale.total_amount) || 0)
+        // Chart Data (Last 7 days)
+        const groups = monthReceipts.reduce((acc: any, r) => {
+          const day = new Date(r.created_at).toLocaleDateString('en-US', { weekday: 'short' })
+          acc[day] = (acc[day] || 0) + (Number(r.total_amount) || 0)
           return acc
         }, {})
         
         setChartData(Object.keys(groups).map(key => ({ day: key, amount: groups[key] })))
       }
 
-      // 5. Fetch Recent Sales Feed
+      // 4. Fetch Recent Sales Feed (From receipts)
       const { data: history } = await supabase
-        .from('sales')
+        .from('receipts')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(8)
 
-      // 6. Top Products (Low Stock Alerts)
-      const { data: lowStockProducts } = await supabase
-        .from('products')
-        .select('*')
-        .limit(5)
+      // 5. Process Top Products / Low Stock (Summing Variants)
+      if (allProducts) {
+        const processedProducts = allProducts.map(p => {
+          const totalStock = p.variants?.reduce((sum: number, v: any) => sum + (v.stock || 0), 0) || 0;
+          return {
+            ...p,
+            totalStock,
+            variant_count: p.variants?.length || 0
+          }
+        })
+
+        // Filter for "Low Stock Alerts" - items with less than 10 total units
+        const lowStock = processedProducts
+          .filter(p => p.totalStock < 10)
+          .sort((a, b) => a.totalStock - b.totalStock)
+          .slice(0, 5)
+
+        setTopProducts(lowStock)
+      }
 
       setRecentSales(history || [])
-      setTopProducts(lowStockProducts || [])
 
     } catch (err) {
       console.error("Dashboard Fetch Error:", err)
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedDate])
 
   useEffect(() => {
+    setLoading(true)
     fetchData()
 
-    // Real-time: Refresh when any sale is added
+    // --- REAL-TIME SYNC ENGINE ---
     const channel = supabase
       .channel('admin-live-updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, () => {
+      // Listen for receipts (Revenue updates)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'receipts' 
+      }, () => {
         setNotifications(prev => prev + 1)
+        fetchData()
+      })
+      // Listen for products or variants (Stock updates)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'variants' 
+      }, () => {
         fetchData()
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-  }, [selectedDate])
+    return () => { 
+      supabase.removeChannel(channel) 
+    }
+  }, [selectedDate, fetchData])
 
   return { 
     stats, 

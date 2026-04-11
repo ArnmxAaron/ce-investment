@@ -13,8 +13,6 @@ export const ReceiptsLog = () => {
   const [loading, setLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [mounted, setMounted] = useState(false)
-  
-  // Single search state for Name or ID
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
@@ -22,28 +20,46 @@ export const ReceiptsLog = () => {
     fetchSales()
   }, [])
 
-  async function fetchSales() {
-    setIsRefreshing(true)
+  // --- CHANGE THIS SECTION IN YOUR CODE ---
+async function fetchSales() {
+  setIsRefreshing(true)
+  try {
     const { data, error } = await supabase
-      .from('sales') 
+      .from('receipts') // <--- Changed from 'sales' to 'receipts'
       .select('*')
       .order('created_at', { ascending: false })
+    
+    if (error) throw error
     
     if (data) {
       setSales(data)
       if (data.length > 0) setSelectedSale(data[0])
     }
+  } catch (err) {
+    console.error("Fetch Sales Error:", err)
+  } finally {
     setLoading(false)
     setIsRefreshing(false)
   }
+}
 
-  // UPDATED: Search matches Name OR the last 6 digits of the ID (No: #XXXXXX)
+  // Helper to safely parse items regardless of if they are JSON or String
+  const getParsedItems = (items: any) => {
+    if (!items) return []
+    if (Array.isArray(items)) return items
+    try {
+      return JSON.parse(items)
+    } catch (e) {
+      console.error("Parsing Error:", e)
+      return []
+    }
+  }
+
   const filteredSales = useMemo(() => {
     return sales.filter(sale => {
       const cleanSearch = searchTerm.toLowerCase().replace('#', '')
       const receiptId = sale.id.slice(-6).toLowerCase()
       const buyerName = (sale.buyer_name || '').toLowerCase()
-      
       return buyerName.includes(cleanSearch) || receiptId.includes(cleanSearch)
     })
   }, [sales, searchTerm])
@@ -76,7 +92,7 @@ export const ReceiptsLog = () => {
           <div className="relative">
             <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
             <input 
-              placeholder="Search Name or ID (e.g. #850CBE)"
+              placeholder="Search Name or ID..."
               className="w-full bg-slate-50 border border-slate-100 p-3 pl-11 rounded-xl text-[11px] font-bold outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -107,16 +123,11 @@ export const ReceiptsLog = () => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="font-black text-slate-900 text-xs italic">NLE {sale.total_amount?.toLocaleString()}</p>
+                <p className="font-black text-slate-900 text-xs italic">NLE {parseFloat(sale.total_amount || 0).toLocaleString()}</p>
                 <FiChevronRight className={`ml-auto mt-2 ${selectedSale?.id === sale.id ? 'text-blue-600 translate-x-1' : 'text-slate-200'}`} />
               </div>
             </button>
           ))}
-          {filteredSales.length === 0 && (
-            <div className="text-center py-10 opacity-30">
-              <p className="text-[10px] font-black uppercase">No records found</p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -124,7 +135,6 @@ export const ReceiptsLog = () => {
       <div className="flex-1 overflow-y-auto bg-[#F1F5F9] p-8 custom-scrollbar">
         {selectedSale ? (
           <div className="max-w-3xl mx-auto">
-            {/* Action Bar */}
             <div className="flex justify-between items-center mb-6 no-print">
                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Verified Ledger Entry</span>
                <button 
@@ -135,10 +145,9 @@ export const ReceiptsLog = () => {
                </button>
             </div>
 
-            {/* RECEIPT DESIGN */}
             <div className="receipt-print-area bg-white p-10 text-black font-serif relative border border-slate-200">
               
-              {/* WATERMARK WITH ID */}
+              {/* WATERMARK */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-[0.04] select-none z-0">
                 <div className="border-[12px] border-black p-8 -rotate-45 flex flex-col items-center">
                     <h1 className="text-[120px] font-black uppercase leading-none">ORIGINAL</h1>
@@ -146,7 +155,7 @@ export const ReceiptsLog = () => {
                 </div>
               </div>
 
-              {/* Header Section */}
+              {/* Header */}
               <div className="text-center mb-4 relative z-10">
                 <h1 className="text-5xl font-black uppercase tracking-tight mb-1">C & E INVESTMENT</h1>
                 <p className="text-sm font-bold italic">Dealer in all types Building Materials</p>
@@ -159,8 +168,8 @@ export const ReceiptsLog = () => {
               </div>
 
               {/* Buyer Info */}
-              <div className="grid grid-cols-2 gap-10 mb-4 text-sm relative z-10">
-                <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-10 mb-4 text-sm relative z-10 text-left">
+                <div className="space-y-4 text-left">
                   <div className="flex gap-2 border-b-2 border-dotted border-black pb-1">
                     <span className="font-black uppercase shrink-0">Buyer:</span>
                     <span className="uppercase font-bold text-base">{selectedSale.buyer_name || "WALKING CUSTOMER"}</span>
@@ -191,18 +200,19 @@ export const ReceiptsLog = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedSale.items?.map((item: any, idx: number) => (
-                    <tr key={idx} className="h-10">
+                  {getParsedItems(selectedSale.items).map((item: any, idx: number) => (
+                    <tr key={idx} className="h-10 text-left">
                       <td className="border-2 border-black p-2 text-center font-black text-lg">{item.quantity}</td>
                       <td className="border-2 border-black p-2 uppercase font-black text-sm">{item.name}</td>
-                      <td className="border-2 border-black p-2 text-right">NLe {item.price?.toLocaleString()}</td>
+                      <td className="border-2 border-black p-2 text-right">NLe {parseFloat(item.price || 0).toLocaleString()}</td>
                       <td className="border-2 border-black p-2 text-right font-black text-lg">
-                        NLe {(item.price * item.quantity).toLocaleString()}
+                        NLe {(parseFloat(item.price || 0) * (item.quantity || 1)).toLocaleString()}
                       </td>
                     </tr>
                   ))}
-                  {[...Array(Math.max(0, 8 - (selectedSale.items?.length || 0)))].map((_, i) => (
-                    <tr key={i} className="h-10">
+                  {/* Fill empty rows to make it look like a standard paper invoice */}
+                  {[...Array(Math.max(0, 8 - (getParsedItems(selectedSale.items).length)))].map((_, i) => (
+                    <tr key={`empty-${i}`} className="h-10">
                       <td className="border-2 border-black"></td>
                       <td className="border-2 border-black"></td>
                       <td className="border-2 border-black"></td>
@@ -214,14 +224,14 @@ export const ReceiptsLog = () => {
                   <tr className="bg-slate-50">
                     <td colSpan={3} className="border-2 border-black p-3 text-right font-black uppercase text-lg">Total Amount Paid</td>
                     <td className="border-2 border-black p-3 text-right font-black text-2xl underline decoration-double">
-                      NLe {selectedSale.total_amount?.toLocaleString()}
+                      NLe {parseFloat(selectedSale.total_amount || 0).toLocaleString()}
                     </td>
                   </tr>
                 </tfoot>
               </table>
 
-              {/* Signature Row */}
-              <div className="mt-12 flex justify-between items-end px-4 relative z-10 break-inside-avoid">
+              {/* Footer / Signatures */}
+              <div className="mt-12 flex justify-between items-end px-4 relative z-10">
                 <div className="text-center w-56 border-t-2 border-black pt-2">
                   <p className="text-[10px] uppercase font-black tracking-tighter">Customer Signature</p>
                 </div>
@@ -240,10 +250,6 @@ export const ReceiptsLog = () => {
                   <p className="text-[10px] uppercase font-black italic underline decoration-1">For: C & E INVESTMENT (Manager)</p>
                 </div>
               </div>
-
-              <div className="mt-8 text-center opacity-40 relative z-10">
-                <p className="text-[8px] font-bold uppercase tracking-[0.2em]">Computer Generated Invoice • No Refunds Without Receipt</p>
-              </div>
             </div>
           </div>
         ) : (
@@ -260,7 +266,6 @@ export const ReceiptsLog = () => {
           .no-print { display: none !important; }
           .receipt-print-area, .receipt-print-area * { visibility: visible; }
           .receipt-print-area { position: absolute; left: 0; top: 0; width: 100% !important; border: none !important; padding: 10mm !important; }
-          .break-inside-avoid { break-inside: avoid; }
           * { -webkit-print-color-adjust: exact; color-adjust: exact; }
           @page { size: A4 portrait; margin: 10mm; }
         }

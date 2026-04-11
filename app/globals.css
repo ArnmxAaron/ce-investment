@@ -86,3 +86,4 @@ body {
 .modal-overlay.is-active {
   pointer-events: auto; /* Only capture clicks when active */
 }
+

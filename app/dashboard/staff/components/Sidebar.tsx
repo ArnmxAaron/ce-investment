@@ -23,11 +23,20 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
   const router = useRouter()
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) setUserEmail(user.email ?? 'Staff Member')
+    const checkUser = async () => {
+      // FIX: Use getSession first to avoid auth-token lock competition
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session?.user) {
+        setUserEmail(session.user.email ?? 'Staff Member')
+      } else {
+        // Fallback check if session isn't in memory
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) setUserEmail(user.email ?? 'Staff Member')
+      }
     }
-    getUser()
+    
+    checkUser()
   }, [])
 
   const handleLogout = async () => {
@@ -56,7 +65,7 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
         <div className="min-w-[40px] h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
           <span className="font-black italic text-sm tracking-tighter">CE</span>
         </div>
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {isHovered && (
             <motion.div 
               initial={{ opacity: 0, x: -10 }}
@@ -87,7 +96,7 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
               <div className={`transition-transform duration-300 ${activeView === item.id ? 'scale-110' : 'group-hover:scale-110'}`}>
                 {item.icon}
               </div>
-              <AnimatePresence>
+              <AnimatePresence mode="wait">
                 {isHovered && (
                   <motion.span 
                     initial={{ opacity: 0, x: -5 }}
@@ -115,18 +124,21 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
           <div className="min-w-[32px] h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400">
             <FiUser size={16} />
           </div>
-          {isHovered && (
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              className="flex flex-col overflow-hidden"
-            >
-              <span className="text-[10px] font-bold text-white truncate uppercase tracking-tighter">
-                {userEmail?.split('@')[0]}
-              </span>
-              <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-widest">Authorized</span>
-            </motion.div>
-          )}
+          <AnimatePresence mode="wait">
+            {isHovered && (
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                className="flex flex-col overflow-hidden"
+              >
+                <span className="text-[10px] font-bold text-white truncate uppercase tracking-tighter">
+                  {userEmail?.split('@')[0]}
+                </span>
+                <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-widest">Authorized</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <button 
@@ -136,15 +148,18 @@ export const Sidebar = ({ activeView, onViewChange }: SidebarProps) => {
           <div className="group-hover:rotate-12 transition-transform">
             <FiLogOut size={20}/>
           </div>
-          {isHovered && (
-            <motion.span 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              className="font-bold text-[10px] uppercase tracking-widest whitespace-nowrap"
-            >
-              Secure Sign Out
-            </motion.span>
-          )}
+          <AnimatePresence mode="wait">
+            {isHovered && (
+              <motion.span 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                className="font-bold text-[10px] uppercase tracking-widest whitespace-nowrap"
+              >
+                Secure Sign Out
+              </motion.span>
+            )}
+          </AnimatePresence>
         </button>
       </div>
     </motion.aside>

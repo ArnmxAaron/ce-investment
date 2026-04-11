@@ -4,7 +4,7 @@ import { useSalesLogic, Product, CartItem } from '../../../hooks/useSalesLogic'
 import { ProductCard } from '../../../components/ProductCard'
 import { Sidebar } from './components/Sidebar'
 import { ReceiptsLog } from './components/ReceiptsLog'
-import { SalesHistory } from './components/SalesHistory' // Added the new History component
+import { SalesHistory } from './components/SalesHistory' 
 import { ProductModal } from './components/ProductModal'
 import { CartItemRow } from './components/CartItemRow'
 import { PrintableInvoice } from './components/PrintableInvoice'
@@ -13,6 +13,8 @@ import { ErrorModal } from './components/ErrorModal'
 import { CustomerEntryModal } from './components/CustomerEntryModal'
 import { FiShoppingBag, FiLoader, FiPrinter } from 'react-icons/fi'
 import { supabase } from '@/lib/supabase'
+// --- IMPORTED CHAT COMPONENT ---
+import { TerminalChat } from './components/TerminalChat'
 
 // --- SKELETON COMPONENT ---
 const SkeletonCard = () => (
@@ -32,7 +34,6 @@ export default function StaffTerminal() {
     fetchProducts 
   } = useSalesLogic()
 
-  // UPDATED: Added 'history' to the allowed views
   const [activeView, setActiveView] = useState<'sales' | 'receipts' | 'history'>('sales');
   
   const [mounted, setMounted] = useState(false);
@@ -48,7 +49,6 @@ export default function StaffTerminal() {
   const [totalSalesToday, setTotalSalesToday] = useState(0);
   const [sortBy, setSortBy] = useState<'low' | 'high' | 'none'>('none');
 
-  // --- REVENUE FETCHING LOGIC ---
   const fetchDailyRevenue = useCallback(async () => {
     try {
       const now = new Date();
@@ -76,7 +76,6 @@ export default function StaffTerminal() {
     }
   }, []);
 
-  // --- INITIAL MOUNT & REALTIME SYNC ---
   useEffect(() => {
     setMounted(true);
     setTempId(new Date().getTime().toString().slice(-6));
@@ -93,7 +92,6 @@ export default function StaffTerminal() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchDailyRevenue]);
 
-  // --- SALE COMPLETION LOGIC ---
   const onCompleteSale = async () => {
     if (cart.length === 0 || isProcessing) return;
 
@@ -123,7 +121,6 @@ export default function StaffTerminal() {
     }
   };
 
-  // --- UI HELPERS ---
   const getTotalStock = (p: Product) => {
     return p.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || 0;
   };
@@ -171,7 +168,6 @@ export default function StaffTerminal() {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
 
-      {/* Sidebar now handles the 'history' view change */}
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
 
       <main className="flex-1 ml-20 transition-all relative h-screen">
@@ -262,9 +258,13 @@ export default function StaffTerminal() {
         ) : activeView === 'receipts' ? (
           <ReceiptsLog />
         ) : (
-          <SalesHistory /> // NEW: Handles the 'history' state
+          <SalesHistory /> 
         )}
       </main>
+
+      {/* --- ADDED CHAT COMPONENT HERE --- */}
+      <TerminalChat />
+
     </div>
   )
 }
